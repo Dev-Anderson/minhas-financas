@@ -36,6 +36,21 @@ Certifique-se de ter instalado na sua máquina:
 ```
 
 ---
+## Próximos passos: 
+1. Listar todas as categorias cadastradas
+2. Aba principal deverá aparecer todas as opções de menu
+3. Cadastro de categorias em massa, criar um import de csv em outra pasta para esse tipo de cadastro
+4. Tipos de gastos (futuros, gasto)
+
+- Aba principal deverá aparecer todas as opções de menus
+- Lista de gastos por categoria, listar o total geral de gastos por categoria
+- Lista de gastos por dia, listar o total gatos por dia e por categoria
+- Total gasto, mostrar o quanto foi gasto no total 
+- Adicionar rendimentos (ganhos no mes)
+- Criar uma opção de fechamento mensagem
+- Modolarização do projeto, adicionar design patters nele
+
+---
 
 ## 📋 Passo a Passo para Executar o Projeto
 
