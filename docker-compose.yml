@@ -16,20 +16,5 @@ services:
       timeout: 3s
       retries: 5
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: golang_finances
-    stdin_open: true
-    tty: true
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=postgres://user:password@postgres:5432/finances?sslmode=disable
-    volumes:
-      - .:/app
-
 volumes:
   pgdata:

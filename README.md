@@ -1,138 +1,46 @@
 ```markdown
-# 📊 Gerenciador de Finanças Pessoais - Nubank
+# Minhas Finanças
 
-Aplicação CLI desenvolvida em Golang para importar, armazenar e categorizar extratos de cartão de crédito do Nubank em formato CSV, utilizando PostgreSQL e Docker.
+Aplicação de linha de comando em Go para importar extratos CSV para PostgreSQL. Cada importação substitui os lançamentos anteriores pelos dados do arquivo escolhido.
 
----
+## Pré-requisitos
 
-## 🚀 Tecnologias Utilizadas
+- Go instalado
+- Docker com Docker Compose
+- Arquivo de extrato CSV na pasta do projeto, com cabeçalho `date,title,amount` e datas no formato `AAAA-MM-DD`
 
-- **Go 1.26** (para o binário da aplicação)
-- **PostgreSQL 16** (banco de dados relacional com healthcheck integrado)
-- **pgx/v5** (driver de alta performance para conexão com o Postgres)
-- **Docker & Docker Compose** (orquestração de containers)
+## Executar
 
----
+1. Inicie manualmente o banco de dados:
 
-## 🛠️ Pré-requisitos
+	```sh
+	docker compose up -d postgres
+	```
 
-Certifique-se de ter instalado na sua máquina:
-- [Docker](https://www.docker.com/) e Docker Compose
-- [Git](https://git-scm.com/) (opcional, para clonagem)
+2. Na pasta do projeto, inicie o programa:
 
----
+	```sh
+	go run .
+	```
 
-## 📂 Estrutura do Projeto
+3. Use o menu numerado (também aceita os nomes das opções):
 
-```text
-.
-├── main.go               # Código fonte da aplicação Golang (CLI + Banco de Dados)
-├── Dockerfile            # Multi-stage build para Go 1.26 com alpine
-├── docker-compose.yml    # Orquestração dos serviços (Postgres + App)
-├── go.mod                # Dependências do Go
-├── go.sum                # Checksum das dependências
-└── *.csv                 # Extratos do Nubank (ex: Nubank_2026-09-12.csv)
+	- `1`: importar extrato; informe o mês/ano (`AAAA-MM`) e o nome do CSV na pasta do projeto. A importação substitui os lançamentos anteriores.
+	- `2`: cadastrar categoria.
+	- `3`: listar categorias.
+	- `4`: excluir uma categoria pelo ID. Os vínculos de despesas são removidos; lançamentos existentes são preservados sem categoria.
+	- `5`: vincular o nome de uma despesa do extrato a uma categoria, escolhida pelo ID. Cadastrar novamente uma despesa altera seu vínculo.
+	- `6`: listar os nomes de despesas e suas categorias.
+	- `7`: categorizar lançamentos conforme os nomes cadastrados. A comparação ignora maiúsculas/minúsculas; quando mais de um nome combina, usa o mais específico.
+	- `8`: cadastrar despesa manual, informando primeiro o mês de referência (`AAAA-MM`), depois o dia, nome e valor. Esses lançamentos são preservados quando um novo CSV é importado.
+	- `9`: mostrar o total geral das despesas.
+	- `10`: mostrar o total das despesas por categoria, incluindo `Não categorizado` e um total de conferência.
+	- `0`: sair.
 
-```
+Os relatórios consideram somente valores positivos; créditos, pagamentos e estornos com valor negativo não entram no total de despesas.
 
----
-## Próximos passos: 
-1. Listar todas as categorias cadastradas
-2. Aba principal deverá aparecer todas as opções de menu
-3. Cadastro de categorias em massa, criar um import de csv em outra pasta para esse tipo de cadastro
-4. Tipos de gastos (futuros, gasto)
+O mês/ano informado na importação fica salvo em `statement_month`. Os valores monetários podem usar vírgula decimal, por exemplo `34,76`.
 
-- Aba principal deverá aparecer todas as opções de menus
-- Lista de gastos por categoria, listar o total geral de gastos por categoria
-- Lista de gastos por dia, listar o total gatos por dia e por categoria
-- Total gasto, mostrar o quanto foi gasto no total 
-- Adicionar rendimentos (ganhos no mes)
-- Criar uma opção de fechamento mensagem
-- Modolarização do projeto, adicionar design patters nele
+4. Digite `sair` para encerrar.
 
----
-
-## 📋 Passo a Passo para Executar o Projeto
-
-### 1. Organizar os arquivos
-
-Certifique-se de que todos os arquivos (`main.go`, `Dockerfile`, `docker-compose.yml`, `go.mod`, `go.sum`) estão na mesma pasta do projeto e que o seu arquivo de extrato em `.csv` do Nubank também está na raiz do diretório.
-
-### 2. Construir e subir os containers
-
-Abra o terminal na pasta do projeto e execute o comando abaixo para realizar o build da aplicação e iniciar o banco de dados em segundo plano:
-
-```bash
-docker compose up -d --build
-
-```
-
-*O Docker iniciará o PostgreSQL e aguardará o banco estar pronto e aceitando conexões antes de inicializar o container da aplicação Go.*
-
-### 3. Acessar o terminal interativo da aplicação
-
-Para interagir com a CLI (digitar os comandos), conecte-se ao container em execução:
-
-```bash
-docker attach golang_finances
-
-```
-
-*(Caso queira sair da sessão sem desligar o container, pressione `Ctrl + P` seguido de `Ctrl + Q`).*
-
-### 4. Utilizar os comandos no terminal
-
-Assim que a aplicação iniciar, você verá o prompt interativo `>`. Os comandos disponíveis são:
-
-* **`/help`**: Exibe a lista completa de comandos e suas descrições.
-```text
-> /help
-
-```
-
-
-* **`/import`**: Lê automaticamente todos os arquivos `.csv` presentes no diretório e registra os novos gastos no banco de dados (evitando duplicatas).
-```text
-> /import
-Importação concluída. 68 novas transações registradas.
-
-```
-
-
-* **`/categoria "<titulo>" <nome_categoria>`**: Cria ou atualiza uma regra de histórico. Sempre que o título do gasto contiver o texto especificado entre aspas, ele será categorizado automaticamente.
-```text
-> /categoria "Mercado Lizza" Mercado
-> /categoria "Auto Post Central Li" Transporte
-
-```
-
-
-* **`/classificar`**: Aplica as regras cadastradas às transações pendentes ("Não Classificado") e exibe os itens que ainda não possuem regra correspondente.
-```text
-> /classificar
-
-```
-
-
-
----
-
-## 🛑 Como Parar os Serviços
-
-Para pausar os containers preservando os dados salvos no banco:
-
-```bash
-docker compose down
-
-```
-
-Para parar os containers e apagar todos os dados do banco (limpando o volume persistente):
-
-```bash
-docker compose down -v
-
-```
-
-```
-
-```
+A URL de conexão pode ser alterada em `.env` pela variável `DATABASE_URL`. Os dados do PostgreSQL ficam persistidos no volume Docker `pgdata`. Para parar o banco sem apagar os dados, use `docker compose down`.
