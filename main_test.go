@@ -77,3 +77,46 @@ func TestFormatBRL(t *testing.T) {
 		}
 	}
 }
+
+func TestParseBackupRecordCategory(t *testing.T) {
+	record, err := parseBackupRecord([]string{"CATEGORY", "12", "Moradia", "", "", "", "", ""})
+	if err != nil {
+		t.Fatalf("parseBackupRecord retornou erro: %v", err)
+	}
+	if record.typeName != "CATEGORY" || record.id != 12 || record.values[0] != "Moradia" {
+		t.Fatalf("registro inesperado: %#v", record)
+	}
+}
+
+func TestParseBackupRecordTransaction(t *testing.T) {
+	row := []string{"TRANSACTION", "23", "2026-10-02", "Aluguel", "1800.00", "2026-10-01", "MANUAL", "4"}
+	if _, err := parseBackupRecord(row); err != nil {
+		t.Fatalf("parseBackupRecord retornou erro: %v", err)
+	}
+}
+
+func TestParseBackupRecordRejectsInvalidData(t *testing.T) {
+	tests := [][]string{
+		{"UNKNOWN", "1", "", "", "", "", "", ""},
+		{"CATEGORY", "0", "Moradia", "", "", "", "", ""},
+		{"EXPENSE_CATEGORY", "1", "invalid", "Aluguel", "", "", "", ""},
+		{"TRANSACTION", "1", "2026-10-32", "Aluguel", "10.00", "2026-10-01", "MANUAL", ""},
+		{"TRANSACTION", "1", "2026-10-01", "Aluguel", "10.00", "2026-10-01", "MANUAL", "invalid"},
+	}
+	for _, row := range tests {
+		if _, err := parseBackupRecord(row); err == nil {
+			t.Errorf("parseBackupRecord(%v) deveria retornar erro", row)
+		}
+	}
+}
+
+func TestIsLocalCSVFileName(t *testing.T) {
+	if !isLocalCSVFileName("backup.csv") {
+		t.Fatal("nome CSV local deveria ser aceito")
+	}
+	for _, fileName := range []string{"", "backup.txt", "../backup.csv", "/tmp/backup.csv"} {
+		if isLocalCSVFileName(fileName) {
+			t.Errorf("nome %q deveria ser rejeitado", fileName)
+		}
+	}
+}

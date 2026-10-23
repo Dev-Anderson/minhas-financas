@@ -39,16 +39,10 @@ func main() {
 	reader := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Println("\n=== Minhas Finanças ===")
-		fmt.Println("1 - Importar extrato CSV")
-		fmt.Println("2 - Cadastrar categoria")
-		fmt.Println("3 - Listar categorias")
-		fmt.Println("4 - Excluir categoria")
-		fmt.Println("5 - Vincular despesa a categoria")
-		fmt.Println("6 - Listar despesas e categorias")
-		fmt.Println("7 - Categorizar lançamentos")
-		fmt.Println("8 - Cadastrar despesa manual")
-		fmt.Println("9 - Mostrar total geral de despesas")
-		fmt.Println("10 - Mostrar despesas por categoria")
+		fmt.Println("1 - Cadastros")
+		fmt.Println("2 - Consultas")
+		fmt.Println("3 - Relatórios")
+		fmt.Println("4 - Ferramentas")
 		fmt.Println("0 - Sair")
 		fmt.Print("> ")
 
@@ -57,7 +51,46 @@ func main() {
 		}
 
 		switch strings.ToLower(strings.TrimSpace(reader.Text())) {
-		case "1", "import":
+		case "1", "cadastro", "cadastros":
+			runRegistrationMenu(ctx, db, reader)
+		case "2", "consulta", "consultas":
+			runQueryMenu(ctx, db, reader)
+		case "3", "relatorio", "relatórios", "relatorios":
+			runReportMenu(ctx, db, reader)
+		case "4", "ferramenta", "ferramentas":
+			runToolsMenu(ctx, db, reader)
+		case "0", "sair", "exit", "quit":
+			fmt.Println("Até mais!")
+			return
+		case "":
+		default:
+			fmt.Println("Opção não reconhecida. Escolha um número ou nome do menu.")
+		}
+	}
+
+	if err := reader.Err(); err != nil {
+		fmt.Printf("Erro ao ler entrada: %v\n", err)
+	}
+}
+
+func runRegistrationMenu(ctx context.Context, db *pgxpool.Pool, reader *bufio.Scanner) {
+	for {
+		fmt.Println("\n=== Cadastros ===")
+		fmt.Println("1 - Importar extrato CSV")
+		fmt.Println("2 - Cadastrar categoria")
+		fmt.Println("4 - Excluir categoria")
+		fmt.Println("5 - Vincular despesa a categoria")
+		fmt.Println("7 - Categorizar lançamentos")
+		fmt.Println("8 - Cadastrar despesa manual")
+		fmt.Println("0 - Voltar")
+		fmt.Print("> ")
+
+		if !reader.Scan() {
+			return
+		}
+
+		switch strings.ToLower(strings.TrimSpace(reader.Text())) {
+		case "1", "import", "importar", "importar extrato csv":
 			fmt.Print("Mês e ano do extrato (AAAA-MM): ")
 			if !reader.Scan() {
 				return
@@ -94,21 +127,13 @@ func main() {
 				continue
 			}
 			fmt.Println("Categoria cadastrada como ativa.")
-		case "3", "listar categorias", "categorias":
-			if err := listCategories(ctx, db); err != nil {
-				fmt.Printf("Erro ao listar categorias: %v\n", err)
-			}
 		case "4", "excluir categoria", "remover categoria":
 			if err := deleteCategory(ctx, db, reader); err != nil {
 				fmt.Printf("Erro ao excluir categoria: %v\n", err)
 			}
-		case "5", "vincular despesa", "categoria despesa":
+		case "5", "vincular despesa", "categoria despesa", "vincular despesa a categoria":
 			if err := createExpenseCategory(ctx, db, reader); err != nil {
 				fmt.Printf("Erro ao vincular despesa: %v\n", err)
-			}
-		case "6", "listar despesas", "vinculos":
-			if err := listExpenseCategories(ctx, db); err != nil {
-				fmt.Printf("Erro ao listar vínculos: %v\n", err)
 			}
 		case "7", "categorizar", "categorizar lançamentos":
 			categorized, uncategorized, err := categorizeTransactions(ctx, db)
@@ -117,30 +142,412 @@ func main() {
 				continue
 			}
 			fmt.Printf("Categorizações aplicadas: %d. Sem categoria correspondente: %d.\n", categorized, uncategorized)
-		case "8", "cadastrar despesas", "cadastrar despesa":
+		case "8", "cadastrar despesas", "cadastrar despesa", "cadastrar despesa manual":
 			if err := createManualExpense(ctx, db, reader); err != nil {
 				fmt.Printf("Erro ao cadastrar despesa: %v\n", err)
 			}
-		case "9", "total geral", "total despesas":
-			if err := reportTotalExpenses(ctx, db); err != nil {
-				fmt.Printf("Erro ao calcular total de despesas: %v\n", err)
-			}
-		case "10", "despesas por categoria", "total por categoria":
-			if err := reportExpensesByCategory(ctx, db); err != nil {
-				fmt.Printf("Erro ao calcular despesas por categoria: %v\n", err)
-			}
-		case "0", "sair", "exit", "quit":
-			fmt.Println("Até mais!")
+		case "0", "voltar", "sair":
 			return
 		case "":
 		default:
-			fmt.Println("Opção não reconhecida. Escolha um número ou nome do menu.")
+			fmt.Println("Opção não reconhecida. Escolha um número ou nome da opção.")
+		}
+	}
+}
+
+func runQueryMenu(ctx context.Context, db *pgxpool.Pool, reader *bufio.Scanner) {
+	for {
+		fmt.Println("\n=== Consultas ===")
+		fmt.Println("3 - Listar categorias")
+		fmt.Println("6 - Listar despesas e categorias")
+		fmt.Println("0 - Voltar")
+		fmt.Print("> ")
+
+		if !reader.Scan() {
+			return
+		}
+
+		switch strings.ToLower(strings.TrimSpace(reader.Text())) {
+		case "3", "listar categorias", "categorias":
+			if err := listCategories(ctx, db); err != nil {
+				fmt.Printf("Erro ao listar categorias: %v\n", err)
+			}
+		case "6", "listar despesas", "vinculos", "listar despesas e categorias":
+			if err := listExpenseCategories(ctx, db); err != nil {
+				fmt.Printf("Erro ao listar vínculos: %v\n", err)
+			}
+		case "0", "voltar", "sair":
+			return
+		case "":
+		default:
+			fmt.Println("Opção não reconhecida. Escolha um número ou nome da opção.")
+		}
+	}
+}
+
+func runReportMenu(ctx context.Context, db *pgxpool.Pool, reader *bufio.Scanner) {
+	for {
+		fmt.Println("\n=== Relatórios ===")
+		fmt.Println("9 - Mostrar total geral de despesas")
+		fmt.Println("10 - Mostrar despesas por categoria")
+		fmt.Println("0 - Voltar")
+		fmt.Print("> ")
+
+		if !reader.Scan() {
+			return
+		}
+
+		switch strings.ToLower(strings.TrimSpace(reader.Text())) {
+		case "9", "total geral", "total despesas", "mostrar total geral de despesas":
+			if err := reportTotalExpenses(ctx, db); err != nil {
+				fmt.Printf("Erro ao calcular total de despesas: %v\n", err)
+			}
+		case "10", "despesas por categoria", "total por categoria", "mostrar despesas por categoria":
+			if err := reportExpensesByCategory(ctx, db); err != nil {
+				fmt.Printf("Erro ao calcular despesas por categoria: %v\n", err)
+			}
+		case "0", "voltar", "sair":
+			return
+		case "":
+		default:
+			fmt.Println("Opção não reconhecida. Escolha um número ou nome da opção.")
+		}
+	}
+}
+
+func runToolsMenu(ctx context.Context, db *pgxpool.Pool, reader *bufio.Scanner) {
+	for {
+		fmt.Println("\n=== Ferramentas ===")
+		fmt.Println("1 - Exportação de dados para CSV")
+		fmt.Println("2 - Importação de backup CSV")
+		fmt.Println("0 - Voltar")
+		fmt.Print("> ")
+
+		if !reader.Scan() {
+			return
+		}
+
+		switch strings.ToLower(strings.TrimSpace(reader.Text())) {
+		case "1", "exportar", "exportação", "exportacao", "exportar dados para csv":
+			fileName, ok := prompt(reader, "Nome do arquivo CSV para exportar: ")
+			if !ok {
+				return
+			}
+			if !isLocalCSVFileName(fileName) {
+				fmt.Println("Informe apenas o nome de um arquivo .csv que ficará na pasta do programa.")
+				continue
+			}
+			counts, err := exportAllData(ctx, db, fileName)
+			if err != nil {
+				fmt.Printf("Erro ao exportar dados: %v\n", err)
+				continue
+			}
+			fmt.Printf("Exportação concluída em %s: %d categorias, %d vínculos e %d lançamentos.\n",
+				fileName, counts.categories, counts.expenseRules, counts.transactions)
+		case "2", "importar", "importação", "importacao", "importar dados de csv":
+			fileName, ok := prompt(reader, "Nome do arquivo CSV para importar: ")
+			if !ok {
+				return
+			}
+			if !isLocalCSVFileName(fileName) {
+				fmt.Println("Informe apenas o nome de um arquivo .csv que esteja na pasta do programa.")
+				continue
+			}
+			counts, err := importAllData(ctx, db, fileName)
+			if err != nil {
+				fmt.Printf("Erro ao importar dados: %v\n", err)
+				continue
+			}
+			fmt.Printf("Importação concluída: %d categorias, %d vínculos e %d lançamentos.\n",
+				counts.categories, counts.expenseRules, counts.transactions)
+		case "0", "voltar", "sair":
+			return
+		case "":
+		default:
+			fmt.Println("Opção não reconhecida. Escolha um número ou nome da opção.")
+		}
+	}
+}
+
+func isLocalCSVFileName(fileName string) bool {
+	return fileName != "" && filepath.Base(fileName) == fileName && strings.ToLower(filepath.Ext(fileName)) == ".csv"
+}
+
+type backupCounts struct {
+	categories   int
+	expenseRules int
+	transactions int
+}
+
+type backupRecord struct {
+	typeName string
+	id       int64
+	values   [6]string
+}
+
+var backupCSVHeader = []string{"record_type", "id", "value1", "value2", "value3", "value4", "value5", "value6"}
+
+func exportAllData(ctx context.Context, db *pgxpool.Pool, fileName string) (backupCounts, error) {
+	file, err := os.Create(fileName)
+	if err != nil {
+		return backupCounts{}, fmt.Errorf("criar arquivo %q: %w", fileName, err)
+	}
+	defer file.Close()
+
+	csvWriter := csv.NewWriter(file)
+	if err := csvWriter.Write(backupCSVHeader); err != nil {
+		return backupCounts{}, err
+	}
+	var counts backupCounts
+
+	categoryRows, err := db.Query(ctx, `SELECT id, nome FROM categoria ORDER BY id`)
+	if err != nil {
+		return counts, err
+	}
+	for categoryRows.Next() {
+		var id int64
+		var name string
+		if err := categoryRows.Scan(&id, &name); err != nil {
+			categoryRows.Close()
+			return counts, err
+		}
+		if err := writeBackupRecord(csvWriter, "CATEGORY", id, name); err != nil {
+			categoryRows.Close()
+			return counts, err
+		}
+		counts.categories++
+	}
+	if err := categoryRows.Err(); err != nil {
+		categoryRows.Close()
+		return counts, err
+	}
+	categoryRows.Close()
+
+	ruleRows, err := db.Query(ctx, `SELECT id, id_categoria, nome_despesas FROM categoria_despesa ORDER BY id`)
+	if err != nil {
+		return counts, err
+	}
+	for ruleRows.Next() {
+		var id, categoryID int64
+		var expenseName string
+		if err := ruleRows.Scan(&id, &categoryID, &expenseName); err != nil {
+			ruleRows.Close()
+			return counts, err
+		}
+		if err := writeBackupRecord(csvWriter, "EXPENSE_CATEGORY", id, strconv.FormatInt(categoryID, 10), expenseName); err != nil {
+			ruleRows.Close()
+			return counts, err
+		}
+		counts.expenseRules++
+	}
+	if err := ruleRows.Err(); err != nil {
+		ruleRows.Close()
+		return counts, err
+	}
+	ruleRows.Close()
+
+	transactionRows, err := db.Query(ctx, `
+		SELECT id, to_char(date, 'YYYY-MM-DD'), title, amount::text,
+		       to_char(statement_month, 'YYYY-MM-DD'), origin, COALESCE(id_categoria::text, '')
+		FROM transactions ORDER BY id`)
+	if err != nil {
+		return counts, err
+	}
+	for transactionRows.Next() {
+		var id int64
+		var transactionDate, title, amount, statementMonth, origin, categoryID string
+		if err := transactionRows.Scan(&id, &transactionDate, &title, &amount, &statementMonth, &origin, &categoryID); err != nil {
+			transactionRows.Close()
+			return counts, err
+		}
+		if err := writeBackupRecord(csvWriter, "TRANSACTION", id, transactionDate, title, amount, statementMonth, origin, categoryID); err != nil {
+			transactionRows.Close()
+			return counts, err
+		}
+		counts.transactions++
+	}
+	if err := transactionRows.Err(); err != nil {
+		transactionRows.Close()
+		return counts, err
+	}
+	transactionRows.Close()
+
+	csvWriter.Flush()
+	if err := csvWriter.Error(); err != nil {
+		return counts, err
+	}
+	return counts, nil
+}
+
+func writeBackupRecord(writer *csv.Writer, typeName string, id int64, values ...string) error {
+	row := make([]string, len(backupCSVHeader))
+	row[0] = typeName
+	row[1] = strconv.FormatInt(id, 10)
+	copy(row[2:], values)
+	return writer.Write(row)
+}
+
+func importAllData(ctx context.Context, db *pgxpool.Pool, fileName string) (backupCounts, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return backupCounts{}, fmt.Errorf("abrir %q: %w", fileName, err)
+	}
+	defer file.Close()
+
+	csvReader := csv.NewReader(file)
+	header, err := csvReader.Read()
+	if err != nil {
+		return backupCounts{}, fmt.Errorf("ler cabeçalho: %w", err)
+	}
+	if !equalCSVRecord(header, backupCSVHeader) {
+		return backupCounts{}, fmt.Errorf("formato inválido; esperado cabeçalho: %s", strings.Join(backupCSVHeader, ","))
+	}
+
+	var records []backupRecord
+	var counts backupCounts
+	for rowNumber := 2; ; rowNumber++ {
+		row, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return counts, fmt.Errorf("ler linha %d: %w", rowNumber, err)
+		}
+		record, err := parseBackupRecord(row)
+		if err != nil {
+			return counts, fmt.Errorf("linha %d: %w", rowNumber, err)
+		}
+		records = append(records, record)
+		switch record.typeName {
+		case "CATEGORY":
+			counts.categories++
+		case "EXPENSE_CATEGORY":
+			counts.expenseRules++
+		case "TRANSACTION":
+			counts.transactions++
 		}
 	}
 
-	if err := reader.Err(); err != nil {
-		fmt.Printf("Erro ao ler entrada: %v\n", err)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return backupCounts{}, err
 	}
+	defer tx.Rollback(ctx)
+
+	var categoryCount, ruleCount, transactionCount int64
+	err = tx.QueryRow(ctx, `
+		SELECT (SELECT COUNT(*) FROM categoria),
+		       (SELECT COUNT(*) FROM categoria_despesa),
+		       (SELECT COUNT(*) FROM transactions)`).Scan(&categoryCount, &ruleCount, &transactionCount)
+	if err != nil {
+		return backupCounts{}, err
+	}
+	if categoryCount != 0 || ruleCount != 0 || transactionCount != 0 {
+		return backupCounts{}, fmt.Errorf("o banco de destino não está vazio; a importação foi cancelada para preservar os dados existentes")
+	}
+
+	for _, record := range records {
+		switch record.typeName {
+		case "CATEGORY":
+			_, err = tx.Exec(ctx, `INSERT INTO categoria (id, nome) VALUES ($1, $2)`, record.id, record.values[0])
+		case "EXPENSE_CATEGORY":
+			categoryID, _ := strconv.ParseInt(record.values[0], 10, 64)
+			_, err = tx.Exec(ctx, `INSERT INTO categoria_despesa (id, id_categoria, nome_despesas) VALUES ($1, $2, $3)`, record.id, categoryID, record.values[1])
+		case "TRANSACTION":
+			var categoryID any
+			if record.values[5] != "" {
+				parsedID, _ := strconv.ParseInt(record.values[5], 10, 64)
+				categoryID = parsedID
+			}
+			_, err = tx.Exec(ctx, `
+				INSERT INTO transactions (id, date, title, amount, statement_month, origin, id_categoria)
+				VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				record.id, record.values[0], record.values[1], record.values[2], record.values[3], record.values[4], categoryID)
+		}
+		if err != nil {
+			return backupCounts{}, fmt.Errorf("importar registro %s %d: %w", record.typeName, record.id, err)
+		}
+	}
+
+	for _, table := range []string{"categoria", "categoria_despesa", "transactions"} {
+		query := fmt.Sprintf(`SELECT setval(pg_get_serial_sequence('%s', 'id'), COALESCE(MAX(id), 1), COUNT(*) > 0) FROM %s`, table, table)
+		if _, err := tx.Exec(ctx, query); err != nil {
+			return backupCounts{}, fmt.Errorf("atualizar sequência de %s: %w", table, err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return backupCounts{}, err
+	}
+	return counts, nil
+}
+
+func parseBackupRecord(row []string) (backupRecord, error) {
+	if len(row) != len(backupCSVHeader) {
+		return backupRecord{}, fmt.Errorf("esperadas %d colunas, recebidas %d", len(backupCSVHeader), len(row))
+	}
+	id, err := strconv.ParseInt(row[1], 10, 64)
+	if err != nil || id <= 0 {
+		return backupRecord{}, fmt.Errorf("ID inválido")
+	}
+	record := backupRecord{typeName: row[0], id: id}
+	copy(record.values[:], row[2:])
+
+	switch record.typeName {
+	case "CATEGORY":
+		if record.values[0] == "" || !allValuesEmpty(record.values[1:]) {
+			return backupRecord{}, fmt.Errorf("registro CATEGORY inválido")
+		}
+	case "EXPENSE_CATEGORY":
+		categoryID, err := strconv.ParseInt(record.values[0], 10, 64)
+		if err != nil || categoryID <= 0 || record.values[1] == "" || !allValuesEmpty(record.values[2:]) {
+			return backupRecord{}, fmt.Errorf("registro EXPENSE_CATEGORY inválido")
+		}
+	case "TRANSACTION":
+		if _, err := time.Parse("2006-01-02", record.values[0]); err != nil {
+			return backupRecord{}, fmt.Errorf("data da transação inválida")
+		}
+		if record.values[1] == "" || record.values[4] == "" || !allValuesEmpty(record.values[6:]) {
+			return backupRecord{}, fmt.Errorf("registro TRANSACTION inválido")
+		}
+		if _, err := strconv.ParseFloat(record.values[2], 64); err != nil {
+			return backupRecord{}, fmt.Errorf("valor da transação inválido")
+		}
+		if _, err := time.Parse("2006-01-02", record.values[3]); err != nil {
+			return backupRecord{}, fmt.Errorf("mês de referência inválido")
+		}
+		if record.values[5] != "" {
+			categoryID, err := strconv.ParseInt(record.values[5], 10, 64)
+			if err != nil || categoryID <= 0 {
+				return backupRecord{}, fmt.Errorf("categoria da transação inválida")
+			}
+		}
+	case "":
+		return backupRecord{}, fmt.Errorf("tipo de registro vazio")
+	default:
+		return backupRecord{}, fmt.Errorf("tipo de registro desconhecido %q", record.typeName)
+	}
+	return record, nil
+}
+
+func equalCSVRecord(actual, expected []string) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for index := range expected {
+		if strings.TrimSpace(actual[index]) != expected[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func allValuesEmpty(values []string) bool {
+	for _, value := range values {
+		if value != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func prompt(reader *bufio.Scanner, label string) (string, bool) {

@@ -25,17 +25,11 @@ Aplicação de linha de comando em Go para importar extratos CSV para PostgreSQL
 
 3. Use o menu numerado (também aceita os nomes das opções):
 
-	- `1`: importar extrato; informe o mês/ano (`AAAA-MM`) e o nome do CSV na pasta do projeto. A importação substitui os lançamentos anteriores.
-	- `2`: cadastrar categoria.
-	- `3`: listar categorias.
-	- `4`: excluir uma categoria pelo ID. Os vínculos de despesas são removidos; lançamentos existentes são preservados sem categoria.
-	- `5`: vincular o nome de uma despesa do extrato a uma categoria, escolhida pelo ID. Cadastrar novamente uma despesa altera seu vínculo.
-	- `6`: listar os nomes de despesas e suas categorias.
-	- `7`: categorizar lançamentos conforme os nomes cadastrados. A comparação ignora maiúsculas/minúsculas; quando mais de um nome combina, usa o mais específico.
-	- `8`: cadastrar despesa manual, informando primeiro o mês de referência (`AAAA-MM`), depois o dia, nome e valor. Esses lançamentos são preservados quando um novo CSV é importado.
-	- `9`: mostrar o total geral das despesas.
-	- `10`: mostrar o total das despesas por categoria, incluindo `Não categorizado` e um total de conferência.
-	- `0`: sair.
+	- `1 - Cadastros`: importar extrato (`1`), cadastrar categoria (`2`), excluir categoria (`4`), vincular despesa a categoria (`5`), categorizar lançamentos (`7`) e cadastrar despesa manual (`8`).
+	- `2 - Consultas`: listar categorias (`3`) e listar despesas e categorias (`6`).
+	- `3 - Relatórios`: mostrar total geral de despesas (`9`) e despesas por categoria (`10`).
+	- `4 - Ferramentas`: exportar todos os dados para um CSV (`1`) ou importar um CSV de backup (`2`). Informe apenas o nome do arquivo, que deve estar na pasta do projeto. A restauração preserva IDs, categorias, vínculos e lançamentos, e só é permitida quando as tabelas do banco de destino estão vazias. A operação é integral: se algum registro for inválido, nada é gravado.
+	- `0`: voltar nos submenus ou sair no menu principal.
 
 Os relatórios consideram somente valores positivos; créditos, pagamentos e estornos com valor negativo não entram no total de despesas.
 
