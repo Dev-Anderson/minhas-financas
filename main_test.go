@@ -78,6 +78,70 @@ func TestFormatBRL(t *testing.T) {
 	}
 }
 
+func TestBuildDashboardData(t *testing.T) {
+	data := buildDashboardData([]dashboardRow{
+		{CategoryName: "Moradia", Title: "Aluguel", AmountCents: 180000},
+		{CategoryName: "Moradia", Title: "Condomínio", AmountCents: 45000},
+		{CategoryName: "Transporte", Title: "Combustível", AmountCents: 25000},
+		{Uncategorized: true, Title: "Compra sem categoria", AmountCents: 1000},
+	})
+
+	if data.IncomeCents != 0 {
+		t.Errorf("entradas = %d; esperado 0", data.IncomeCents)
+	}
+	if data.ExpenseCents != 251000 {
+		t.Errorf("saídas = %d; esperado 251000", data.ExpenseCents)
+	}
+	if data.BalanceCents != -251000 {
+		t.Errorf("saldo = %d; esperado -251000", data.BalanceCents)
+	}
+	if len(data.Categories) != 2 || data.Categories[0].Name != "Moradia" || data.Categories[0].TotalCents != 225000 {
+		t.Errorf("categorias inesperadas: %#v", data.Categories)
+	}
+	if len(data.Categories[0].Expenses) != 2 {
+		t.Errorf("despesas de Moradia = %d; esperado 2", len(data.Categories[0].Expenses))
+	}
+	if len(data.Uncategorized) != 1 || data.Uncategorized[0].TotalCents != 1000 {
+		t.Errorf("despesas sem categoria inesperadas: %#v", data.Uncategorized)
+	}
+}
+
+func TestBuildDashboardDataWithoutExpenses(t *testing.T) {
+	data := buildDashboardData(nil)
+	if data.ExpenseCents != 0 || data.BalanceCents != 0 || len(data.Categories) != 0 {
+		t.Errorf("dashboard vazio inesperado: %#v", data)
+	}
+}
+
+func TestValidateManualExpense(t *testing.T) {
+	date, month, amount, err := validateManualExpense(manualExpenseRequest{
+		Month:  "2024-02",
+		Day:    29,
+		Title:  "  Consulta  ",
+		Amount: "125,50",
+	})
+	if err != nil {
+		t.Fatalf("validateManualExpense retornou erro: %v", err)
+	}
+	if date.Format("2006-01-02") != "2024-02-29" || month.Format("2006-01-02") != "2024-02-01" || amount != 125.5 {
+		t.Errorf("despesa validada inesperada: data=%s mês=%s valor=%v", date.Format("2006-01-02"), month.Format("2006-01-02"), amount)
+	}
+}
+
+func TestValidateManualExpenseRejectsInvalidInput(t *testing.T) {
+	tests := []manualExpenseRequest{
+		{Month: "2026-02", Day: 29, Title: "Despesa", Amount: "10,00"},
+		{Month: "2026-02-01", Day: 1, Title: "Despesa", Amount: "10,00"},
+		{Month: "2026-02", Day: 1, Title: "  ", Amount: "10,00"},
+		{Month: "2026-02", Day: 1, Title: "Despesa", Amount: "inválido"},
+	}
+	for _, test := range tests {
+		if _, _, _, err := validateManualExpense(test); err == nil {
+			t.Errorf("validateManualExpense(%#v) deveria retornar erro", test)
+		}
+	}
+}
+
 func TestParseBackupRecordCategory(t *testing.T) {
 	record, err := parseBackupRecord([]string{"CATEGORY", "12", "Moradia", "", "", "", "", ""})
 	if err != nil {

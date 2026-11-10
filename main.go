@@ -35,6 +35,12 @@ func main() {
 		fmt.Printf("Erro ao preparar tabelas: %v\n", err)
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "--web" {
+		if err := serveDashboard(db); err != nil {
+			fmt.Printf("Erro ao iniciar dashboard: %v\n", err)
+		}
+		return
+	}
 
 	reader := bufio.NewScanner(os.Stdin)
 	for {
