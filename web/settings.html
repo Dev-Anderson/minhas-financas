@@ -5,274 +5,638 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f7f5">
   <title>Configurações · Minhas Finanças</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: "DM Sans", sans-serif; background: #f6f7f5; }
-    h1, h2, h3, .font-display { font-family: "Manrope", sans-serif; }
-    .soft-grid { background-image: radial-gradient(#d7ddd7 0.8px, transparent 0.8px); background-size: 19px 19px; }
-    input, select { outline: none; }
-    input:focus, select:focus { box-shadow: 0 0 0 3px rgba(49, 130, 77, .12); border-color: #3d8b58; }
-  </style>
+  <link rel="stylesheet" href="/assets/styles.css">
 </head>
-<body class="min-h-screen text-slate-800 antialiased">
-  <div class="pointer-events-none fixed inset-0 -z-10 soft-grid opacity-40"></div>
-  <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10 lg:py-12">
-    <header class="mb-8 flex flex-wrap items-center justify-between gap-5">
-      <div class="flex items-center gap-3.5">
-        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#193f2a] text-white shadow-lg shadow-emerald-950/10">
-          <svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.7"/><path d="m19.4 15 .1.1a1.8 1.8 0 1 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 1 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3H3.7a1.8 1.8 0 1 1 0-3.6h.2a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 1 1 3.6 0v.2a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 1 1 0 3.6h-.2a1.8 1.8 0 0 0-.9 3Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-        </div>
-        <div>
-          <p class="text-xs font-bold uppercase tracking-[.18em] text-emerald-800">Minhas Finanças</p>
-          <h1 class="font-display text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">Gestão de despesas</h1>
-        </div>
-      </div>
-      <a href="/" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 shadow-sm transition hover:border-emerald-200 hover:text-emerald-800">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Voltar ao dashboard
+<body>
+  <main class="page">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M8 9h8M8 13h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </span>
+        <span><span class="eyebrow">Minhas finanças</span><h1>Configurações</h1></span>
       </a>
+      <a class="back-link" href="/">← Voltar à visão geral</a>
     </header>
 
-    <div class="mb-7 flex flex-wrap gap-2" role="navigation" aria-label="Navegação principal">
-      <a href="/" class="rounded-full px-4 py-2 text-sm font-semibold text-slate-500 transition hover:bg-white hover:text-slate-800">Visão geral</a>
-      <a href="/settings" aria-current="page" class="rounded-full bg-[#193f2a] px-4 py-2 text-sm font-bold text-white shadow-sm">Configurações</a>
-    </div>
+    <section class="panel settings-panel" aria-labelledby="reference-month-title">
+      <p class="eyebrow">Período de trabalho</p>
+      <h2 id="reference-month-title">Meses de referência</h2>
+      <p class="subtle">Cadastre os períodos que poderão ser selecionados na visão geral e associados aos extratos importados.</p>
 
-    <div id="notice" class="mb-5 hidden rounded-2xl px-5 py-4 text-sm font-semibold" role="status" aria-live="polite"></div>
-
-    <section class="mb-5 grid gap-5 xl:grid-cols-2">
-      <article class="rounded-[1.65rem] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
-        <div class="mb-6 flex items-start gap-4">
-          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-          <div><p class="text-xs font-bold uppercase tracking-[.15em] text-slate-400">Organização</p><h2 class="font-display mt-1 text-lg font-extrabold text-slate-900">Cadastro de categorias</h2><p class="mt-1 text-sm text-slate-500">Crie grupos para organizar seus gastos.</p></div>
+      <form id="reference-month-form" class="category-form">
+        <label class="category-label" for="reference-month-name">Descrição do mês</label>
+        <div class="category-fields">
+          <input
+            class="category-input"
+            id="reference-month-name"
+            name="name"
+            type="text"
+            maxlength="100"
+            autocomplete="off"
+            placeholder="Ex.: Novembro de 2026"
+            required
+          >
+          <button class="button" id="submit-reference-month" type="submit">Cadastrar mês</button>
         </div>
-        <form id="category-form" class="flex flex-col gap-3 sm:flex-row">
-          <label class="sr-only" for="category-name">Nome da categoria</label>
-          <input id="category-name" name="name" required maxlength="100" placeholder="Ex.: Moradia" class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400">
-          <button class="rounded-xl bg-[#193f2a] px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-900 disabled:cursor-wait disabled:opacity-60" type="submit">Adicionar categoria</button>
-        </form>
-        <div class="mt-6 border-t border-slate-100 pt-5">
-          <div class="mb-3 flex items-center justify-between"><h3 class="text-sm font-bold text-slate-700">Categorias cadastradas</h3><span id="category-count" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">0</span></div>
-          <ul id="category-list" class="space-y-2"><li class="text-sm text-slate-400">Carregando categorias…</li></ul>
-        </div>
-      </article>
+        <div class="notice" id="reference-month-notice" role="status" aria-live="polite"></div>
+      </form>
 
-      <article class="rounded-[1.65rem] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
-        <div class="mb-6 flex items-start gap-4">
-          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14m0 0 6-6m-6 6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-          <div><p class="text-xs font-bold uppercase tracking-[.15em] text-slate-400">Lançamento</p><h2 class="font-display mt-1 text-lg font-extrabold text-slate-900">Despesa manual</h2><p class="mt-1 text-sm text-slate-500">Registre uma despesa fora do extrato importado.</p></div>
-        </div>
-        <form id="expense-form" class="space-y-4">
-          <div><label for="expense-title" class="mb-1.5 block text-xs font-bold text-slate-600">Nome da despesa</label><input id="expense-title" name="title" required maxlength="200" placeholder="Ex.: Consulta médica" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"></div>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <div><label for="expense-month" class="mb-1.5 block text-xs font-bold text-slate-600">Mês de referência</label><input id="expense-month" name="month" type="month" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm"></div>
-            <div><label for="expense-day" class="mb-1.5 block text-xs font-bold text-slate-600">Dia</label><input id="expense-day" name="day" type="number" min="1" max="31" required placeholder="1–31" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm"></div>
-            <div><label for="expense-amount" class="mb-1.5 block text-xs font-bold text-slate-600">Valor (R$)</label><input id="expense-amount" name="amount" inputmode="decimal" required placeholder="0,00" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm"></div>
-          </div>
-          <button class="w-full rounded-xl bg-[#193f2a] px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-900 disabled:cursor-wait disabled:opacity-60 sm:w-auto" type="submit">Salvar despesa</button>
-        </form>
-      </article>
-
-      <article class="rounded-[1.65rem] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7">
-        <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div class="flex items-start gap-4">
-            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-700"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7m6-2 2 2 4-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-            <div><p class="text-xs font-bold uppercase tracking-[.15em] text-slate-400">Automação</p><h2 class="font-display mt-1 text-lg font-extrabold text-slate-900">Vincular despesa e categoria</h2><p class="mt-1 text-sm text-slate-500">Associe o nome do extrato a uma categoria.</p></div>
-          </div>
-          <button id="categorize-button" class="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60" type="button">Atualizar</button>
-        </div>
-        <form id="link-form" class="space-y-4">
-          <div><label for="link-expense" class="mb-1.5 block text-xs font-bold text-slate-600">Nome como aparece no extrato</label><input id="link-expense" name="expenseName" required maxlength="200" placeholder="Ex.: MERCADO EXEMPLO" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"></div>
-          <div><label for="link-category" class="mb-1.5 block text-xs font-bold text-slate-600">Categoria</label><select id="link-category" name="categoryId" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"><option value="">Selecione uma categoria</option></select></div>
-          <button class="rounded-xl bg-[#193f2a] px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50" type="submit">Salvar vínculo</button>
-        </form>
-        <div class="mt-6 border-t border-slate-100 pt-5"><h3 class="mb-3 text-sm font-bold text-slate-700">Vínculos existentes</h3><ul id="link-list" class="space-y-2"><li class="text-sm text-slate-400">Carregando vínculos…</li></ul></div>
-      </article>
-
+      <div class="reference-month-list" id="reference-month-list" aria-live="polite">
+        <p class="subtle">Carregando meses de referência…</p>
+      </div>
     </section>
-    <footer class="py-5 text-center text-xs text-slate-400">As alterações são salvas diretamente no banco de dados.</footer>
-  </main>
 
+    <section class="panel settings-panel" aria-labelledby="import-title">
+      <p class="eyebrow">Dados da conta</p>
+      <h2 id="import-title">Importar extrato Nubank</h2>
+      <p class="subtle">Selecione o arquivo CSV exportado pelo Nubank. A importação substitui os lançamentos do mês selecionado; vínculos de categoria serão mantidos quando data, descrição e valor corresponderem. Vínculos sem correspondência serão removidos.</p>
+
+      <form id="import-form" novalidate>
+        <div class="upload-box">
+          <label for="import-reference-month" class="category-label">Mês de referência</label>
+          <select class="reference-month-select import-month-select" id="import-reference-month" name="referenceMonthId" required>
+            <option value="">Carregando meses…</option>
+          </select>
+          <label for="csv-file" class="subtle">Arquivo de extrato <span aria-hidden="true">*</span></label>
+          <div class="upload-actions">
+            <div>
+              <input class="file-input" id="csv-file" name="file" type="file" accept=".csv,text/csv" required aria-describedby="file-help file-name">
+              <label class="file-button" for="csv-file">Selecionar arquivo CSV</label>
+              <p class="subtle" id="file-help" style="margin-top:9px">Somente arquivos .csv, com até 10 MB.</p>
+            </div>
+            <span class="file-name" id="file-name" aria-live="polite">Nenhum arquivo selecionado</span>
+            <button class="button" id="submit-import" type="submit" disabled>Importar arquivo</button>
+          </div>
+        </div>
+        <div class="notice" id="import-notice" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="panel settings-panel" aria-labelledby="category-title">
+      <p class="eyebrow">Organização</p>
+      <h2 id="category-title">Cadastrar categoria</h2>
+      <p class="subtle">Crie categorias para organizar seus lançamentos financeiros.</p>
+
+      <form id="category-form" class="category-form">
+        <label class="category-label" for="category-name">Nome da categoria</label>
+        <div class="category-fields">
+          <input
+            class="category-input"
+            id="category-name"
+            name="name"
+            type="text"
+            maxlength="100"
+            autocomplete="off"
+            placeholder="Ex.: Alimentação"
+            required
+          >
+          <button class="button" id="submit-category" type="submit">Cadastrar categoria</button>
+        </div>
+        <div class="notice" id="category-notice" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="panel settings-panel" aria-labelledby="income-title">
+      <p class="eyebrow">Lançamentos</p>
+      <h2 id="income-title">Cadastrar entrada</h2>
+      <p class="subtle">Registre receitas e associe cada uma a um mês de referência para atualizar o saldo da visão geral.</p>
+
+      <form id="income-form" class="category-form">
+        <div class="manual-income-fields">
+          <div>
+            <label class="category-label" for="income-reference-month">Mês de referência</label>
+            <select class="reference-month-select" id="income-reference-month" name="referenceMonthId" required>
+              <option value="">Carregando meses…</option>
+            </select>
+          </div>
+          <div>
+            <label class="category-label" for="income-name">Descrição</label>
+            <input
+              class="category-input"
+              id="income-name"
+              name="name"
+              type="text"
+              maxlength="150"
+              autocomplete="off"
+              placeholder="Ex.: Salário"
+              required
+            >
+          </div>
+          <div>
+            <label class="category-label" for="income-amount">Valor (R$)</label>
+            <input
+              class="category-input"
+              id="income-amount"
+              name="amount"
+              type="text"
+              inputmode="decimal"
+              maxlength="24"
+              placeholder="0,00"
+              required
+            >
+          </div>
+          <button class="button" id="submit-income" type="submit" disabled>Cadastrar entrada</button>
+        </div>
+        <div class="notice" id="income-notice" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="panel settings-panel" aria-labelledby="expense-title">
+      <p class="eyebrow">Lançamentos</p>
+      <h2 id="expense-title">Cadastrar despesa manual</h2>
+      <p class="subtle">Registre uma despesa que não veio do arquivo de extrato. O valor deve ser positivo e informado em reais.</p>
+
+      <form id="expense-form" class="category-form">
+        <div class="manual-expense-fields">
+          <div>
+            <label class="category-label" for="expense-name">Descrição</label>
+            <input
+              class="category-input"
+              id="expense-name"
+              name="name"
+              type="text"
+              maxlength="150"
+              autocomplete="off"
+              placeholder="Ex.: Conta de internet"
+              required
+            >
+          </div>
+          <div>
+            <label class="category-label" for="expense-amount">Valor (R$)</label>
+            <input
+              class="category-input"
+              id="expense-amount"
+              name="valor"
+              type="text"
+              inputmode="decimal"
+              maxlength="24"
+              placeholder="0,00"
+              aria-describedby="expense-amount-help"
+              required
+            >
+          </div>
+          <button class="button" id="submit-expense" type="submit">Cadastrar despesa</button>
+        </div>
+        <div class="notice" id="expense-notice" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="panel settings-panel" aria-labelledby="expense-category-title">
+      <p class="eyebrow">Organização</p>
+      <h2 id="expense-category-title">Vincular despesas a categorias</h2>
+      <p class="subtle">Escolha uma categoria para cada despesa. Despesas com o mesmo nome compartilham a mesma categoria, mesmo quando têm valores diferentes.</p>
+      <div class="expense-category-list" id="expense-category-list" aria-live="polite">
+        <p class="subtle">Carregando categorias e despesas…</p>
+      </div>
+      <div class="notice" id="expense-category-notice" role="status" aria-live="polite"></div>
+    </section>
+  </main>
   <script>
-    const notice = document.getElementById('notice');
-    let noticeTimer;
-    let categories = [];
+    const form = document.getElementById('import-form');
+    const fileInput = document.getElementById('csv-file');
+    const fileName = document.getElementById('file-name');
+    const submitButton = document.getElementById('submit-import');
+    const notice = document.getElementById('import-notice');
+    const importMonthSelect = document.getElementById('import-reference-month');
+    const incomeMonthSelect = document.getElementById('income-reference-month');
+    const referenceMonthForm = document.getElementById('reference-month-form');
+    const referenceMonthInput = document.getElementById('reference-month-name');
+    const referenceMonthButton = document.getElementById('submit-reference-month');
+    const referenceMonthNotice = document.getElementById('reference-month-notice');
+    const referenceMonthList = document.getElementById('reference-month-list');
+    const maxFileSize = 10 * 1024 * 1024;
+
+    async function requestJSON(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: { Accept: 'application/json', ...(options.headers || {}) }
+      });
+      if (response.status === 204) return null;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Não foi possível concluir a operação.');
+      return result;
+    }
+
+    function showReferenceMonthNotice(message, isError = false) {
+      referenceMonthNotice.textContent = message;
+      referenceMonthNotice.className = `notice visible ${isError ? 'error' : 'success'}`;
+    }
+
+    async function loadReferenceMonths() {
+      const months = await requestJSON('/api/reference-months');
+      renderReferenceMonths(months);
+      importMonthSelect.replaceChildren();
+      incomeMonthSelect.replaceChildren();
+      if (months.length === 0) {
+        importMonthSelect.add(new Option('Cadastre um mês de referência primeiro', ''));
+        incomeMonthSelect.add(new Option('Cadastre um mês de referência primeiro', ''));
+        importMonthSelect.disabled = true;
+        incomeMonthSelect.disabled = true;
+      } else {
+        importMonthSelect.add(new Option('Selecione o mês de referência', ''));
+        incomeMonthSelect.add(new Option('Selecione o mês de referência', ''));
+        months.forEach((month) => {
+          importMonthSelect.add(new Option(month.name, month.id));
+          incomeMonthSelect.add(new Option(month.name, month.id));
+        });
+        importMonthSelect.disabled = false;
+        incomeMonthSelect.disabled = false;
+      }
+      validateSelection();
+    }
+
+    function renderReferenceMonths(months) {
+      referenceMonthList.replaceChildren();
+      if (months.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'subtle reference-month-empty';
+        empty.textContent = 'Nenhum mês de referência cadastrado.';
+        referenceMonthList.append(empty);
+        return;
+      }
+
+      const list = document.createElement('ul');
+      list.className = 'reference-month-items';
+      months.forEach((month) => {
+        const item = document.createElement('li');
+        item.className = 'reference-month-item';
+        const input = document.createElement('input');
+        input.className = 'category-input';
+        input.type = 'text';
+        input.maxLength = 100;
+        input.value = month.name;
+        input.setAttribute('aria-label', `Descrição do mês ${month.name}`);
+
+        const saveButton = document.createElement('button');
+        saveButton.className = 'button secondary-button';
+        saveButton.type = 'button';
+        saveButton.textContent = 'Salvar';
+        saveButton.addEventListener('click', async () => {
+          saveButton.disabled = true;
+          try {
+            await requestJSON(`/api/reference-months/${month.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: input.value })
+            });
+            showReferenceMonthNotice('Descrição do mês atualizada.');
+            await loadReferenceMonths();
+          } catch (error) {
+            showReferenceMonthNotice(error.message, true);
+          } finally {
+            saveButton.disabled = false;
+          }
+        });
+
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'button danger-button';
+        deleteButton.type = 'button';
+        deleteButton.textContent = 'Excluir';
+        deleteButton.addEventListener('click', async () => {
+          if (!window.confirm(`Excluir o mês “${month.name}” da lista? Os registros e transações serão preservados.`)) return;
+          deleteButton.disabled = true;
+          try {
+            await requestJSON(`/api/reference-months/${month.id}`, { method: 'DELETE' });
+            showReferenceMonthNotice('Mês excluído da lista. Os registros vinculados foram preservados.');
+            await loadReferenceMonths();
+          } catch (error) {
+            showReferenceMonthNotice(error.message, true);
+          } finally {
+            deleteButton.disabled = false;
+          }
+        });
+
+        item.append(input, saveButton, deleteButton);
+        list.append(item);
+      });
+      referenceMonthList.append(list);
+    }
+
+    referenceMonthForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      referenceMonthButton.disabled = true;
+      referenceMonthButton.textContent = 'Cadastrando…';
+      referenceMonthNotice.className = 'notice';
+      try {
+        const created = await requestJSON('/api/reference-months', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: referenceMonthInput.value })
+        });
+        referenceMonthForm.reset();
+        showReferenceMonthNotice(`Mês “${created.name}” cadastrado.`);
+        await loadReferenceMonths();
+      } catch (error) {
+        showReferenceMonthNotice(error.message, true);
+      } finally {
+        referenceMonthButton.disabled = false;
+        referenceMonthButton.textContent = 'Cadastrar mês';
+      }
+    });
 
     function showNotice(message, isError = false) {
       notice.textContent = message;
-      notice.className = 'mb-5 rounded-2xl px-5 py-4 text-sm font-semibold ' + (isError ? 'border border-rose-200 bg-rose-50 text-rose-700' : 'border border-emerald-200 bg-emerald-50 text-emerald-800');
-      window.clearTimeout(noticeTimer);
-      noticeTimer = window.setTimeout(() => notice.classList.add('hidden'), 5000);
+      notice.className = `notice visible ${isError ? 'error' : 'success'}`;
     }
 
-    async function request(url, options = {}) {
-      const response = await fetch(url, { ...options, headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers } });
-      if (response.status === 204) return null;
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Não foi possível concluir a operação.');
-      return payload;
-    }
-
-    function renderCategories() {
-      const list = document.getElementById('category-list');
-      list.replaceChildren();
-      document.getElementById('category-count').textContent = categories.length;
-      const select = document.getElementById('link-category');
-      select.replaceChildren(new Option('Selecione uma categoria', ''));
-      categories.forEach((category) => {
-        const item = document.createElement('li');
-        item.className = 'flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3';
-        const name = document.createElement('span');
-        name.className = 'text-sm font-semibold text-slate-700';
-        name.textContent = category.name;
-        const actions = document.createElement('div');
-        actions.className = 'flex items-center gap-3';
-        const option = new Option(category.name, category.id);
-        select.add(option);
-        const id = document.createElement('span');
-        id.className = 'text-xs text-slate-400';
-        id.textContent = `#${category.id}`;
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'rounded-lg px-2 py-1 text-xs font-bold text-rose-600 transition hover:bg-rose-100';
-        remove.textContent = 'Excluir';
-        remove.setAttribute('aria-label', `Excluir categoria ${category.name}`);
-        remove.addEventListener('click', () => deleteCategory(category));
-        actions.append(id, remove);
-        item.append(name, actions);
-        list.append(item);
-      });
-      if (!categories.length) {
-        const empty = document.createElement('li');
-        empty.className = 'rounded-xl border border-dashed border-slate-200 px-4 py-5 text-center text-sm text-slate-400';
-        empty.textContent = 'Nenhuma categoria cadastrada.';
-        list.append(empty);
+    function validateSelection() {
+      notice.className = 'notice';
+      const file = fileInput.files[0];
+      fileName.textContent = file ? file.name : 'Nenhum arquivo selecionado';
+      submitButton.disabled = !file || !importMonthSelect.value;
+      if (!importMonthSelect.value) {
+        if (file) showNotice('Cadastre e selecione um mês de referência antes de importar.', true);
+        return false;
       }
-      document.querySelector('#link-form button[type="submit"]').disabled = categories.length === 0;
+      if (!file) return false;
+
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        fileInput.value = '';
+        fileName.textContent = 'Nenhum arquivo selecionado';
+        submitButton.disabled = true;
+        showNotice('Formato não permitido. Selecione somente um arquivo .csv.', true);
+        return false;
+      }
+      if (file.size > maxFileSize) {
+        fileInput.value = '';
+        fileName.textContent = 'Nenhum arquivo selecionado';
+        submitButton.disabled = true;
+        showNotice('O arquivo excede o limite de 10 MB.', true);
+        return false;
+      }
+      return true;
     }
 
-    function renderRules(rules) {
-      const list = document.getElementById('link-list');
-      list.replaceChildren();
-      if (!rules.length) {
-        const empty = document.createElement('li');
-        empty.className = 'rounded-xl border border-dashed border-slate-200 px-4 py-5 text-center text-sm text-slate-400';
-        empty.textContent = 'Nenhum vínculo cadastrado.';
-        list.append(empty);
+    fileInput.addEventListener('change', validateSelection);
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!validateSelection()) return;
+      const selectedMonth = importMonthSelect.options[importMonthSelect.selectedIndex].text;
+      if (!window.confirm(`Substituir todos os lançamentos Nubank de “${selectedMonth}” pelo conteúdo deste CSV? Categorias serão mantidas apenas para lançamentos com data, descrição e valor correspondentes.`)) return;
+
+      submitButton.disabled = true;
+      submitButton.textContent = 'Importando…';
+      notice.className = 'notice';
+      try {
+        const response = await fetch('/nubank/import', {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { Accept: 'application/json' }
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Não foi possível importar o arquivo.');
+        }
+        showNotice(`Substituição concluída: ${result.imported} lançamento(s) importado(s) para “${selectedMonth}”.`);
+        form.reset();
+        fileName.textContent = 'Nenhum arquivo selecionado';
+      } catch (error) {
+        showNotice(error.message || 'Não foi possível importar o arquivo.', true);
+      } finally {
+        submitButton.textContent = 'Importar arquivo';
+        submitButton.disabled = !fileInput.files.length || !importMonthSelect.value;
+      }
+    });
+
+    const categoryForm = document.getElementById('category-form');
+    const categoryInput = document.getElementById('category-name');
+    const categoryButton = document.getElementById('submit-category');
+    const categoryNotice = document.getElementById('category-notice');
+
+    categoryForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = categoryInput.value.trim();
+      if (!name) {
+        categoryNotice.textContent = 'Informe o nome da categoria.';
+        categoryNotice.className = 'notice visible error';
+        categoryInput.focus();
         return;
       }
-      rules.forEach((rule) => {
-        const item = document.createElement('li');
-        item.className = 'flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3';
-        const expenseName = document.createElement('span');
-        expenseName.className = 'text-sm font-semibold text-slate-700';
-        expenseName.textContent = rule.expenseName;
-        const categoryName = document.createElement('span');
-        categoryName.className = 'rounded-full bg-violet-100 px-2.5 py-1 text-xs font-bold text-violet-700';
-        categoryName.textContent = rule.categoryName;
-        item.append(expenseName, categoryName);
-        list.append(item);
+
+      categoryButton.disabled = true;
+      categoryButton.textContent = 'Cadastrando…';
+      categoryNotice.className = 'notice';
+      try {
+        const response = await fetch('/api/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Não foi possível cadastrar a categoria.');
+        }
+        categoryNotice.textContent = `Categoria “${result.name}” cadastrada com sucesso.`;
+        categoryNotice.className = 'notice visible success';
+        categoryForm.reset();
+        loadExpenseCategories().catch((error) => {
+          showExpenseCategoryNotice(error.message || 'Não foi possível atualizar a lista de categorias e despesas.', true);
+        });
+      } catch (error) {
+        categoryNotice.textContent = error.message || 'Não foi possível cadastrar a categoria.';
+        categoryNotice.className = 'notice visible error';
+      } finally {
+        categoryButton.disabled = false;
+        categoryButton.textContent = 'Cadastrar categoria';
+      }
+    });
+
+    const expenseForm = document.getElementById('expense-form');
+    const expenseButton = document.getElementById('submit-expense');
+    const expenseNotice = document.getElementById('expense-notice');
+    const expenseCategoryList = document.getElementById('expense-category-list');
+    const expenseCategoryNotice = document.getElementById('expense-category-notice');
+    let availableCategories = [];
+
+    const incomeForm = document.getElementById('income-form');
+    const incomeButton = document.getElementById('submit-income');
+    const incomeNotice = document.getElementById('income-notice');
+
+    incomeForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const values = new FormData(incomeForm);
+      const referenceMonthID = values.get('referenceMonthId');
+      const name = values.get('name').trim();
+      const amount = values.get('amount').trim();
+      if (!referenceMonthID || !name || !amount) {
+        incomeNotice.textContent = 'Selecione o mês de referência e informe a descrição e o valor da entrada.';
+        incomeNotice.className = 'notice visible error';
+        return;
+      }
+
+      incomeButton.disabled = true;
+      incomeButton.textContent = 'Cadastrando…';
+      incomeNotice.className = 'notice';
+      try {
+        const created = await requestJSON('/api/incomes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceMonthId: Number(referenceMonthID),
+            name,
+            amount
+          })
+        });
+        const monthName = incomeMonthSelect.options[incomeMonthSelect.selectedIndex].text;
+        incomeNotice.textContent = `Entrada “${created.name}” de ${Number(created.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} cadastrada para “${monthName}”.`;
+        incomeNotice.className = 'notice visible success';
+        incomeForm.reset();
+      } catch (error) {
+        incomeNotice.textContent = error.message || 'Não foi possível cadastrar a entrada.';
+        incomeNotice.className = 'notice visible error';
+      } finally {
+        incomeButton.textContent = 'Cadastrar entrada';
+        incomeButton.disabled = incomeMonthSelect.disabled || !incomeMonthSelect.value;
+      }
+    });
+
+    incomeMonthSelect.addEventListener('change', () => {
+      incomeButton.disabled = incomeMonthSelect.disabled || !incomeMonthSelect.value;
+    });
+
+    expenseForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const values = new FormData(expenseForm);
+      const name = values.get('name').trim();
+      const amount = values.get('valor').trim();
+      if (!name || !amount) {
+        expenseNotice.textContent = 'Informe a descrição e o valor da despesa.';
+        expenseNotice.className = 'notice visible error';
+        return;
+      }
+
+      expenseButton.disabled = true;
+      expenseButton.textContent = 'Cadastrando…';
+      expenseNotice.className = 'notice';
+      try {
+        const response = await fetch('/api/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ name, valor: amount })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Não foi possível cadastrar a despesa.');
+        }
+        expenseNotice.textContent = `Despesa “${result.name}” cadastrada no valor de ${Number(result.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`;
+        expenseNotice.className = 'notice visible success';
+        expenseForm.reset();
+        loadExpenseCategories().catch((error) => {
+          showExpenseCategoryNotice(error.message || 'Não foi possível atualizar a lista de categorias e despesas.', true);
+        });
+      } catch (error) {
+        expenseNotice.textContent = error.message || 'Não foi possível cadastrar a despesa.';
+        expenseNotice.className = 'notice visible error';
+      } finally {
+        expenseButton.disabled = false;
+        expenseButton.textContent = 'Cadastrar despesa';
+      }
+    });
+
+    function showExpenseCategoryNotice(message, isError = false) {
+      expenseCategoryNotice.textContent = message;
+      expenseCategoryNotice.className = `notice visible ${isError ? 'error' : 'success'}`;
+    }
+
+    async function loadExpenseCategories() {
+      const [categories, expenses] = await Promise.all([
+        requestJSON('/api/categories'),
+        requestJSON('/api/expenses')
+      ]);
+      availableCategories = categories;
+      renderExpenseCategories(expenses);
+    }
+
+    function renderExpenseCategories(expenses) {
+      expenseCategoryList.replaceChildren();
+      if (expenses.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'subtle reference-month-empty';
+        empty.textContent = 'Nenhuma despesa cadastrada.';
+        expenseCategoryList.append(empty);
+        return;
+      }
+
+      const list = document.createElement('ul');
+      list.className = 'reference-month-items';
+      expenses.forEach((item) => {
+        const row = document.createElement('li');
+        row.className = 'expense-category-item';
+        const details = document.createElement('div');
+        details.className = 'expense-category-details';
+        const name = document.createElement('strong');
+        name.textContent = item.name;
+        const amount = document.createElement('span');
+        amount.className = 'subtle';
+        amount.textContent = Number(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const source = document.createElement('span');
+        source.className = 'expense-source';
+        source.textContent = item.source === 'nubank' ? 'Importada do CSV' : 'Despesa manual';
+        details.append(name, amount, source);
+
+        const select = document.createElement('select');
+        select.className = 'category-input expense-category-select';
+        select.setAttribute('aria-label', `Categoria da despesa ${item.name}`);
+        select.add(new Option('Selecione uma categoria', ''));
+        availableCategories.forEach((category) => {
+          select.add(new Option(category.name, category.id));
+        });
+        if (item.categoryId != null) select.value = String(item.categoryId);
+        select.disabled = availableCategories.length === 0;
+
+        const saveButton = document.createElement('button');
+        saveButton.className = 'button secondary-button';
+        saveButton.type = 'button';
+        saveButton.textContent = 'Vincular';
+        saveButton.disabled = availableCategories.length === 0;
+        saveButton.addEventListener('click', async () => {
+          if (!select.value) {
+            showExpenseCategoryNotice('Selecione uma categoria antes de vincular.', true);
+            return;
+          }
+          saveButton.disabled = true;
+          try {
+            const result = await requestJSON(`/api/expenses/${item.id}/category`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ categoryId: Number(select.value), source: item.source })
+            });
+            showExpenseCategoryNotice(`Categoria vinculada a ${result.updated} despesa(s) manuais ou importadas com o nome “${item.name}”.`);
+            await loadExpenseCategories();
+          } catch (error) {
+            showExpenseCategoryNotice(error.message, true);
+          } finally {
+            saveButton.disabled = false;
+          }
+        });
+
+        row.append(details, select, saveButton);
+        list.append(row);
       });
-    }
-
-    async function loadSettings() {
-      try {
-        const data = await request('/api/settings');
-        categories = data.categories;
-        renderCategories();
-        renderRules(data.expenseCategories);
-      } catch (error) {
-        showNotice(error.message, true);
-        document.getElementById('category-list').textContent = 'Erro ao carregar categorias.';
-        document.getElementById('link-list').textContent = 'Erro ao carregar vínculos.';
+      expenseCategoryList.append(list);
+      if (availableCategories.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'subtle';
+        empty.textContent = 'Cadastre uma categoria antes de vincular as despesas.';
+        expenseCategoryList.append(empty);
       }
     }
 
-    async function deleteCategory(category) {
-      if (!window.confirm(`Excluir a categoria “${category.name}”? Os lançamentos permanecerão sem categoria.`)) return;
-      try {
-        await request(`/api/categories/${category.id}`, { method: 'DELETE' });
-        showNotice(`Categoria “${category.name}” excluída. Os lançamentos foram preservados sem categoria.`);
-        await loadSettings();
-      } catch (error) {
-        showNotice(error.message, true);
-      }
-    }
-
-    document.getElementById('category-form').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const button = form.querySelector('button');
-      button.disabled = true;
-      try {
-        const name = new FormData(form).get('name').trim();
-        await request('/api/categories', { method: 'POST', body: JSON.stringify({ name }) });
-        form.reset();
-        showNotice('Categoria cadastrada.');
-        await loadSettings();
-      } catch (error) {
-        showNotice(error.message, true);
-      } finally {
-        button.disabled = false;
-      }
+    importMonthSelect.addEventListener('change', validateSelection);
+    loadExpenseCategories().catch((error) => {
+      expenseCategoryList.textContent = error.message || 'Não foi possível carregar as categorias e despesas.';
     });
-
-    document.getElementById('expense-form').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const button = form.querySelector('button');
-      button.disabled = true;
-      try {
-        const values = new FormData(form);
-        await request('/api/expenses', { method: 'POST', body: JSON.stringify({ month: values.get('month'), day: Number(values.get('day')), title: values.get('title').trim(), amount: values.get('amount').trim() }) });
-        form.reset();
-        document.getElementById('expense-month').value = new Date().toISOString().slice(0, 7);
-        showNotice('Despesa manual cadastrada.');
-      } catch (error) {
-        showNotice(error.message, true);
-      } finally {
-        button.disabled = false;
-      }
+    loadReferenceMonths().catch((error) => {
+      referenceMonthList.textContent = error.message || 'Não foi possível carregar os meses de referência.';
+      importMonthSelect.replaceChildren(new Option('Meses indisponíveis', ''));
+      importMonthSelect.disabled = true;
+      incomeMonthSelect.replaceChildren(new Option('Meses indisponíveis', ''));
+      incomeMonthSelect.disabled = true;
+      incomeMonthSelect.replaceChildren(new Option('Meses indisponíveis', ''));
+      incomeMonthSelect.disabled = true;
     });
-
-    document.getElementById('link-form').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const button = form.querySelector('button');
-      button.disabled = true;
-      try {
-        const values = new FormData(form);
-        await request('/api/expense-categories', { method: 'POST', body: JSON.stringify({ categoryId: Number(values.get('categoryId')), expenseName: values.get('expenseName').trim() }) });
-        form.reset();
-        showNotice('Vínculo salvo. A regra será usada ao categorizar lançamentos sem categoria.');
-        await loadSettings();
-      } catch (error) {
-        showNotice(error.message, true);
-      } finally {
-        button.disabled = categories.length === 0;
-      }
-    });
-
-    document.getElementById('categorize-button').addEventListener('click', async (event) => {
-      const button = event.currentTarget;
-      button.disabled = true;
-      button.textContent = 'Atualizando…';
-      try {
-        const result = await request('/api/transactions/categorize', { method: 'POST' });
-        showNotice(`Atualização concluída: ${result.categorized} lançamento(s) categorizado(s); ${result.uncategorized} sem correspondência.`);
-      } catch (error) {
-        showNotice(error.message, true);
-      } finally {
-        button.disabled = false;
-        button.textContent = 'Atualizar';
-      }
-    });
-
-    document.getElementById('expense-month').value = new Date().toISOString().slice(0, 7);
-    loadSettings();
   </script>
 </body>
 </html>
