@@ -354,7 +354,7 @@ func exportAllData(ctx context.Context, db *pgxpool.Pool, fileName string) (back
 
 	transactionRows, err := db.Query(ctx, `
 		SELECT id, to_char(date, 'YYYY-MM-DD'), title, amount::text,
-		       to_char(statement_month, 'YYYY-MM-DD'), origin, COALESCE(id_categoria::text, '')
+		       to_char(statement_month, 'YYYY-MM-DD'), origin, COALESCE(id_categoria::text, ''), paid
 		FROM transactions ORDER BY id`)
 	if err != nil {
 		return counts, err
@@ -362,13 +362,20 @@ func exportAllData(ctx context.Context, db *pgxpool.Pool, fileName string) (back
 	for transactionRows.Next() {
 		var id int64
 		var transactionDate, title, amount, statementMonth, origin, categoryID string
-		if err := transactionRows.Scan(&id, &transactionDate, &title, &amount, &statementMonth, &origin, &categoryID); err != nil {
+		var paid bool
+		if err := transactionRows.Scan(&id, &transactionDate, &title, &amount, &statementMonth, &origin, &categoryID, &paid); err != nil {
 			transactionRows.Close()
 			return counts, err
 		}
 		if err := writeBackupRecord(csvWriter, "TRANSACTION", id, transactionDate, title, amount, statementMonth, origin, categoryID); err != nil {
 			transactionRows.Close()
 			return counts, err
+		}
+		if paid {
+			if err := writeBackupRecord(csvWriter, "PAYMENT", id, "true"); err != nil {
+				transactionRows.Close()
+				return counts, err
+			}
 		}
 		counts.transactions++
 	}
@@ -469,6 +476,12 @@ func importAllData(ctx context.Context, db *pgxpool.Pool, fileName string) (back
 				INSERT INTO transactions (id, date, title, amount, statement_month, origin, id_categoria)
 				VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 				record.id, record.values[0], record.values[1], record.values[2], record.values[3], record.values[4], categoryID)
+		case "PAYMENT":
+			result, updateErr := tx.Exec(ctx, `UPDATE transactions SET paid = TRUE WHERE id = $1`, record.id)
+			err = updateErr
+			if err == nil && result.RowsAffected() == 0 {
+				err = fmt.Errorf("lançamento de pagamento não encontrado")
+			}
 		}
 		if err != nil {
 			return backupCounts{}, fmt.Errorf("importar registro %s %d: %w", record.typeName, record.id, err)
@@ -526,6 +539,10 @@ func parseBackupRecord(row []string) (backupRecord, error) {
 			if err != nil || categoryID <= 0 {
 				return backupRecord{}, fmt.Errorf("categoria da transação inválida")
 			}
+		}
+	case "PAYMENT":
+		if record.values[0] != "true" || !allValuesEmpty(record.values[1:]) {
+			return backupRecord{}, fmt.Errorf("registro PAYMENT inválido")
 		}
 	case "":
 		return backupRecord{}, fmt.Errorf("tipo de registro vazio")
@@ -606,7 +623,8 @@ func createTables(ctx context.Context, db *pgxpool.Pool) error {
 			amount NUMERIC(12, 2) NOT NULL,
 			statement_month DATE NOT NULL,
 			origin TEXT NOT NULL DEFAULT 'IMPORT',
-			id_categoria BIGINT REFERENCES categoria(id)
+			id_categoria BIGINT REFERENCES categoria(id),
+			paid BOOLEAN NOT NULL DEFAULT FALSE
 		)`
 
 	if _, err := db.Exec(ctx, schema); err != nil {
@@ -631,7 +649,10 @@ func createTables(ctx context.Context, db *pgxpool.Pool) error {
 	if _, err := db.Exec(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS transactions_id_unique ON transactions(id)`); err != nil {
 		return err
 	}
-	_, err := db.Exec(ctx, `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS id_categoria BIGINT REFERENCES categoria(id)`)
+	if _, err := db.Exec(ctx, `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS id_categoria BIGINT REFERENCES categoria(id)`); err != nil {
+		return err
+	}
+	_, err := db.Exec(ctx, `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS paid BOOLEAN NOT NULL DEFAULT FALSE`)
 	return err
 }
 
@@ -909,6 +930,31 @@ func importTransactions(ctx context.Context, db *pgxpool.Pool, csvFile string, s
 	}
 	defer tx.Rollback(ctx)
 
+	paymentRows, err := tx.Query(ctx, `
+		SELECT to_char(date, 'YYYY-MM-DD'), title, amount::text,
+		       to_char(statement_month, 'YYYY-MM-DD'), paid
+		FROM transactions
+		WHERE origin = 'IMPORT'
+		ORDER BY id`)
+	if err != nil {
+		return 0, fmt.Errorf("ler status de pagamento anteriores: %w", err)
+	}
+	preservedPaymentStatuses := make(map[importedTransactionKey][]bool)
+	for paymentRows.Next() {
+		var key importedTransactionKey
+		var paid bool
+		if err := paymentRows.Scan(&key.date, &key.title, &key.amount, &key.statementMonth, &paid); err != nil {
+			paymentRows.Close()
+			return 0, fmt.Errorf("ler status de pagamento anteriores: %w", err)
+		}
+		preservedPaymentStatuses[key] = append(preservedPaymentStatuses[key], paid)
+	}
+	if err := paymentRows.Err(); err != nil {
+		paymentRows.Close()
+		return 0, fmt.Errorf("ler status de pagamento anteriores: %w", err)
+	}
+	paymentRows.Close()
+
 	if _, err := tx.Exec(ctx, `DELETE FROM transactions WHERE origin = 'IMPORT'`); err != nil {
 		return 0, fmt.Errorf("limpar lançamentos importados anteriores: %w", err)
 	}
@@ -940,9 +986,16 @@ func importTransactions(ctx context.Context, db *pgxpool.Pool, csvFile string, s
 			return 0, fmt.Errorf("valor inválido na linha %d: %w", rowNumber, err)
 		}
 
+		key := importedTransactionKey{
+			date:           date.Format("2006-01-02"),
+			title:          title,
+			amount:         fmt.Sprintf("%.2f", amount),
+			statementMonth: statementMonth.Format("2006-01-02"),
+		}
+		paid := takePreservedPaymentStatus(preservedPaymentStatuses, key)
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO transactions (date, title, amount, statement_month, origin) VALUES ($1, $2, $3, $4, 'IMPORT')`,
-			date, title, amount, statementMonth,
+			`INSERT INTO transactions (date, title, amount, statement_month, origin, paid) VALUES ($1, $2, $3, $4, 'IMPORT', $5)`,
+			date, title, amount, statementMonth, paid,
 		); err != nil {
 			return 0, fmt.Errorf("inserir linha %d: %w", rowNumber, err)
 		}
@@ -953,6 +1006,22 @@ func importTransactions(ctx context.Context, db *pgxpool.Pool, csvFile string, s
 		return 0, fmt.Errorf("confirmar importação: %w", err)
 	}
 	return importedCount, nil
+}
+
+type importedTransactionKey struct {
+	date           string
+	title          string
+	amount         string
+	statementMonth string
+}
+
+func takePreservedPaymentStatus(statuses map[importedTransactionKey][]bool, key importedTransactionKey) bool {
+	matchingStatuses := statuses[key]
+	if len(matchingStatuses) == 0 {
+		return false
+	}
+	statuses[key] = matchingStatuses[1:]
+	return matchingStatuses[0]
 }
 
 func createManualExpense(ctx context.Context, db *pgxpool.Pool, reader *bufio.Scanner) error {

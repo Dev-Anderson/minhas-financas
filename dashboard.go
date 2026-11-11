@@ -17,11 +17,14 @@ import (
 var dashboardFiles embed.FS
 
 type dashboardData struct {
-	IncomeCents   int64               `json:"incomeCents"`
-	ExpenseCents  int64               `json:"expenseCents"`
-	BalanceCents  int64               `json:"balanceCents"`
-	Categories    []dashboardCategory `json:"categories"`
-	Uncategorized []dashboardExpense  `json:"uncategorized"`
+	IncomeCents    int64               `json:"incomeCents"`
+	ExpenseCents   int64               `json:"expenseCents"`
+	BalanceCents   int64               `json:"balanceCents"`
+	PaidCents      int64               `json:"paidCents"`
+	UnpaidCents    int64               `json:"unpaidCents"`
+	RemainingCents int64               `json:"remainingCents"`
+	Categories     []dashboardCategory `json:"categories"`
+	Uncategorized  []dashboardExpense  `json:"uncategorized"`
 }
 
 type dashboardCategory struct {
@@ -31,15 +34,29 @@ type dashboardCategory struct {
 }
 
 type dashboardExpense struct {
-	Name       string `json:"name"`
-	TotalCents int64  `json:"totalCents"`
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	TotalCents     int64  `json:"totalCents"`
+	Paid           bool   `json:"paid"`
+	Manual         bool   `json:"manual"`
+	StatementMonth string `json:"statementMonth,omitempty"`
+	Day            int    `json:"day,omitempty"`
 }
 
 type dashboardRow struct {
-	CategoryName  string
-	Uncategorized bool
-	Title         string
-	AmountCents   int64
+	CategoryName   string
+	Uncategorized  bool
+	ID             int64
+	Title          string
+	AmountCents    int64
+	Paid           bool
+	Manual         bool
+	StatementMonth string
+	Day            int
+}
+
+type paymentStatusRequest struct {
+	Paid bool `json:"paid"`
 }
 
 type settingsCategory struct {
@@ -78,7 +95,16 @@ func serveDashboard(db *pgxpool.Pool) error {
 		http.ServeFileFS(w, r, dashboardFiles, "web/settings.html")
 	})
 	mux.HandleFunc("GET /api/dashboard", func(w http.ResponseWriter, r *http.Request) {
-		data, err := loadDashboardData(r.Context(), db)
+		monthText := strings.TrimSpace(r.URL.Query().Get("month"))
+		if monthText == "" {
+			monthText = time.Now().Format("2006-01")
+		}
+		referenceMonth, err := parseReferenceMonth(monthText)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, "Mês de referência inválido; use AAAA-MM.")
+			return
+		}
+		data, err := loadDashboardData(r.Context(), db, referenceMonth)
 		if err != nil {
 			http.Error(w, "Não foi possível carregar os dados do dashboard.", http.StatusInternalServerError)
 			return
@@ -88,6 +114,81 @@ func serveDashboard(db *pgxpool.Pool) error {
 		if err := json.NewEncoder(w).Encode(data); err != nil {
 			fmt.Printf("Erro ao enviar dados do dashboard: %v\n", err)
 		}
+	})
+	mux.HandleFunc("PATCH /api/transactions/{id}/payment", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil || id < 1 {
+			writeAPIError(w, http.StatusBadRequest, "ID de lançamento inválido.")
+			return
+		}
+		var request paymentStatusRequest
+		if !decodeJSONBody(w, r, &request) {
+			return
+		}
+		result, err := db.Exec(r.Context(),
+			`UPDATE transactions SET paid = $1 WHERE id = $2 AND amount > 0`,
+			request.Paid, id,
+		)
+		if err != nil {
+			writeAPIError(w, http.StatusInternalServerError, "Não foi possível atualizar o status de pagamento.")
+			return
+		}
+		if result.RowsAffected() == 0 {
+			writeAPIError(w, http.StatusNotFound, "Lançamento não encontrado.")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"paid": request.Paid})
+	})
+	mux.HandleFunc("PATCH /api/transactions/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil || id < 1 {
+			writeAPIError(w, http.StatusBadRequest, "ID de lançamento inválido.")
+			return
+		}
+		var request manualExpenseRequest
+		if !decodeJSONBody(w, r, &request) {
+			return
+		}
+		expenseDate, referenceMonth, amount, err := validateManualExpense(request)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		result, err := db.Exec(r.Context(), `
+			UPDATE transactions
+			SET date = $1, title = $2, amount = $3, statement_month = $4
+			WHERE id = $5 AND origin = 'MANUAL' AND amount > 0`,
+			expenseDate, strings.TrimSpace(request.Title), amount, referenceMonth, id,
+		)
+		if err != nil {
+			writeAPIError(w, http.StatusInternalServerError, "Não foi possível atualizar a despesa manual.")
+			return
+		}
+		if result.RowsAffected() == 0 {
+			writeAPIError(w, http.StatusNotFound, "Despesa manual não encontrada.")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"message": "Despesa manual atualizada."})
+	})
+	mux.HandleFunc("DELETE /api/transactions/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil || id < 1 {
+			writeAPIError(w, http.StatusBadRequest, "ID de lançamento inválido.")
+			return
+		}
+		result, err := db.Exec(r.Context(),
+			`DELETE FROM transactions WHERE id = $1 AND origin = 'MANUAL' AND amount > 0`,
+			id,
+		)
+		if err != nil {
+			writeAPIError(w, http.StatusInternalServerError, "Não foi possível excluir a despesa manual.")
+			return
+		}
+		if result.RowsAffected() == 0 {
+			writeAPIError(w, http.StatusNotFound, "Despesa manual não encontrada.")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		categories, err := getSettingsCategories(r.Context(), db)
@@ -255,8 +356,8 @@ func removeCategory(ctx context.Context, db *pgxpool.Pool, id int64) error {
 
 func validateManualExpense(request manualExpenseRequest) (time.Time, time.Time, float64, error) {
 	monthText := strings.TrimSpace(request.Month)
-	referenceMonth, err := time.Parse("2006-01", monthText)
-	if err != nil || referenceMonth.Format("2006-01") != monthText {
+	referenceMonth, err := parseReferenceMonth(monthText)
+	if err != nil {
 		return time.Time{}, time.Time{}, 0, fmt.Errorf("mês inválido; use AAAA-MM")
 	}
 	if !isValidExpenseDay(referenceMonth, request.Day) {
@@ -270,8 +371,19 @@ func validateManualExpense(request manualExpenseRequest) (time.Time, time.Time, 
 	if err != nil {
 		return time.Time{}, time.Time{}, 0, fmt.Errorf("valor inválido: %w", err)
 	}
+	if amount <= 0 {
+		return time.Time{}, time.Time{}, 0, fmt.Errorf("o valor da despesa deve ser maior que zero")
+	}
 	date := time.Date(referenceMonth.Year(), referenceMonth.Month(), request.Day, 0, 0, 0, 0, time.UTC)
 	return date, referenceMonth, amount, nil
+}
+
+func parseReferenceMonth(monthText string) (time.Time, error) {
+	referenceMonth, err := time.Parse("2006-01", monthText)
+	if err != nil || referenceMonth.Format("2006-01") != monthText {
+		return time.Time{}, fmt.Errorf("mês inválido; use AAAA-MM")
+	}
+	return referenceMonth, nil
 }
 
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, destination any) bool {
@@ -302,19 +414,29 @@ func writeAPIError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
 }
 
-func loadDashboardData(ctx context.Context, db *pgxpool.Pool) (dashboardData, error) {
+func loadDashboardData(ctx context.Context, db *pgxpool.Pool, referenceMonth time.Time) (dashboardData, error) {
+	nextMonth := referenceMonth.AddDate(0, 1, 0)
 	rows, err := db.Query(ctx, `
 		SELECT
+			t.id,
 			COALESCE(c.nome, ''),
 			c.id IS NULL,
 			COALESCE(NULLIF(BTRIM(t.title), ''), 'Despesa sem descrição'),
-			SUM(ROUND(t.amount * 100))::BIGINT
+			ROUND(t.amount * 100)::BIGINT,
+			t.paid,
+			t.origin = 'MANUAL',
+			to_char(t.statement_month, 'YYYY-MM'),
+			EXTRACT(DAY FROM t.date)::INT
 		FROM transactions t
 		LEFT JOIN categoria c ON c.id = t.id_categoria
 		WHERE t.amount > 0
-		GROUP BY c.id, c.nome, COALESCE(NULLIF(BTRIM(t.title), ''), 'Despesa sem descrição')
-		ORDER BY c.id IS NULL, c.nome, SUM(ROUND(t.amount * 100)) DESC,
-			COALESCE(NULLIF(BTRIM(t.title), ''), 'Despesa sem descrição')`)
+			AND t.statement_month >= $1
+			AND t.statement_month < $2
+		ORDER BY c.id IS NULL, c.nome,
+			COALESCE(NULLIF(BTRIM(t.title), ''), 'Despesa sem descrição'),
+			ROUND(t.amount * 100) DESC, t.id`,
+		referenceMonth, nextMonth,
+	)
 	if err != nil {
 		return dashboardData{}, err
 	}
@@ -323,7 +445,7 @@ func loadDashboardData(ctx context.Context, db *pgxpool.Pool) (dashboardData, er
 	var dashboardRows []dashboardRow
 	for rows.Next() {
 		var row dashboardRow
-		if err := rows.Scan(&row.CategoryName, &row.Uncategorized, &row.Title, &row.AmountCents); err != nil {
+		if err := rows.Scan(&row.ID, &row.CategoryName, &row.Uncategorized, &row.Title, &row.AmountCents, &row.Paid, &row.Manual, &row.StatementMonth, &row.Day); err != nil {
 			return dashboardData{}, err
 		}
 		dashboardRows = append(dashboardRows, row)
@@ -343,7 +465,20 @@ func buildDashboardData(rows []dashboardRow) dashboardData {
 
 	for _, row := range rows {
 		data.ExpenseCents += row.AmountCents
-		expense := dashboardExpense{Name: row.Title, TotalCents: row.AmountCents}
+		expense := dashboardExpense{
+			ID:             row.ID,
+			Name:           row.Title,
+			TotalCents:     row.AmountCents,
+			Paid:           row.Paid,
+			Manual:         row.Manual,
+			StatementMonth: row.StatementMonth,
+			Day:            row.Day,
+		}
+		if row.Paid {
+			data.PaidCents += row.AmountCents
+		} else {
+			data.UnpaidCents += row.AmountCents
+		}
 		if row.Uncategorized {
 			data.Uncategorized = append(data.Uncategorized, expense)
 			continue
@@ -361,5 +496,6 @@ func buildDashboardData(rows []dashboardRow) dashboardData {
 	}
 
 	data.BalanceCents = data.IncomeCents - data.ExpenseCents
+	data.RemainingCents = data.ExpenseCents - data.PaidCents
 	return data
 }

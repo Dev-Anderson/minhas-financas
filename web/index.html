@@ -46,6 +46,14 @@
       </div>
     </header>
 
+    <section class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm" aria-label="Filtro do dashboard">
+      <div>
+        <label for="reference-month" class="block text-sm font-bold text-slate-800">Mês de referência</label>
+        <p class="mt-1 text-xs text-slate-500">Os valores exibidos correspondem somente ao mês selecionado.</p>
+      </div>
+      <input id="reference-month" type="month" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100" required>
+    </section>
+
     <section class="mb-5 grid gap-5 lg:grid-cols-2" aria-label="Resumo de entradas e saídas">
       <article class="entry-glow relative overflow-hidden rounded-[1.75rem] border border-emerald-100 p-6 shadow-sm sm:p-8">
         <div class="absolute -right-8 -top-10 h-40 w-40 rounded-full border-[24px] border-emerald-200/30"></div>
@@ -74,7 +82,7 @@
           </span>
         </div>
         <p id="expense-total" class="font-display relative mt-7 text-4xl font-extrabold tracking-tight text-[#e86f6b] sm:text-5xl"><span class="spinner inline-block align-middle" aria-label="Carregando"></span></p>
-        <p class="relative mt-2 text-xs font-medium text-rose-900/50">Soma das despesas positivas cadastradas</p>
+        <p class="relative mt-2 text-xs font-medium text-rose-900/50">Soma das despesas positivas do mês selecionado</p>
       </article>
     </section>
 
@@ -84,6 +92,22 @@
         <p class="mt-1 text-sm text-white/60">Entradas menos saídas</p>
       </div>
       <p id="balance-total" class="font-display text-4xl font-extrabold tracking-tight text-[#ff8982] sm:text-5xl"><span class="spinner inline-block border-white/30 border-t-white align-middle" aria-label="Carregando"></span></p>
+    </section>
+
+    <section class="mb-8 grid gap-4 md:grid-cols-3" aria-label="Resumo de pagamentos">
+      <article class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-[.14em] text-emerald-700">Valor pago</p>
+        <p id="paid-total" class="font-display mt-3 text-2xl font-extrabold tabular-nums text-emerald-700">—</p>
+      </article>
+      <article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-[.14em] text-amber-700">Valor não pago</p>
+        <p id="unpaid-total" class="font-display mt-3 text-2xl font-extrabold tabular-nums text-amber-700">—</p>
+      </article>
+      <article class="rounded-2xl border border-rose-100 bg-white p-5 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-[.14em] text-rose-700">Valor restante</p>
+        <p id="remaining-total" class="font-display mt-3 text-2xl font-extrabold tabular-nums text-rose-700">—</p>
+        <p class="mt-1 text-xs text-slate-400">Total de despesas menos o valor pago</p>
+      </article>
     </section>
 
     <section class="rounded-[1.75rem] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-7" aria-labelledby="expenses-heading">
@@ -102,9 +126,74 @@
     <footer class="py-6 text-center text-xs text-slate-400">Valores calculados com base nos lançamentos salvos no banco de dados.</footer>
   </main>
 
+  <dialog id="edit-expense-dialog" class="w-[calc(100%-2rem)] max-w-lg rounded-2xl p-0 shadow-2xl backdrop:bg-slate-900/40">
+    <form id="edit-expense-form" class="space-y-5 p-6">
+      <div>
+        <h2 class="font-display text-xl font-extrabold text-slate-900">Editar despesa manual</h2>
+        <p class="mt-1 text-sm text-slate-500">Altere os dados desta despesa.</p>
+      </div>
+      <div>
+        <label for="edit-expense-title" class="mb-1.5 block text-xs font-bold text-slate-600">Nome da despesa</label>
+        <input id="edit-expense-title" name="title" required maxlength="200" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+      </div>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div>
+          <label for="edit-expense-month" class="mb-1.5 block text-xs font-bold text-slate-600">Mês de referência</label>
+          <input id="edit-expense-month" name="month" type="month" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
+        </div>
+        <div>
+          <label for="edit-expense-day" class="mb-1.5 block text-xs font-bold text-slate-600">Dia</label>
+          <input id="edit-expense-day" name="day" type="number" min="1" max="31" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
+        </div>
+        <div>
+          <label for="edit-expense-amount" class="mb-1.5 block text-xs font-bold text-slate-600">Valor (R$)</label>
+          <input id="edit-expense-amount" name="amount" inputmode="decimal" required class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
+        </div>
+      </div>
+      <p id="edit-expense-error" class="hidden rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert"></p>
+      <div class="flex justify-end gap-3">
+        <button id="cancel-edit-expense" type="button" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button id="save-edit-expense" type="submit" class="rounded-xl bg-[#193f2a] px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-900 disabled:cursor-wait disabled:opacity-60">Salvar alterações</button>
+      </div>
+    </form>
+  </dialog>
+
   <script>
     const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
     const money = (cents) => currency.format((cents || 0) / 100);
+    const referenceMonthInput = document.getElementById('reference-month');
+    const editExpenseDialog = document.getElementById('edit-expense-dialog');
+    const editExpenseForm = document.getElementById('edit-expense-form');
+    const currentDate = new Date();
+    referenceMonthInput.value = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    let dashboardRequest = 0;
+
+    function showLoadError(message) {
+      const errorBox = document.getElementById('load-error');
+      errorBox.textContent = message;
+      errorBox.classList.remove('hidden');
+    }
+
+    async function responseError(response, fallback) {
+      try {
+        const body = await response.json();
+        return body.error || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function openEditExpense(expense) {
+      editExpenseDialog.dataset.transactionId = expense.id;
+      document.getElementById('edit-expense-title').value = expense.name;
+      document.getElementById('edit-expense-month').value = expense.statementMonth;
+      document.getElementById('edit-expense-day').value = expense.day;
+      document.getElementById('edit-expense-amount').value = `${Math.floor(expense.totalCents / 100)},${String(expense.totalCents % 100).padStart(2, '0')}`;
+      const error = document.getElementById('edit-expense-error');
+      error.textContent = '';
+      error.classList.add('hidden');
+      editExpenseDialog.showModal();
+    }
 
     function expenseCard(title, totalCents, expenses, uncategorized = false) {
       const card = document.createElement('article');
@@ -130,14 +219,75 @@
       list.className = 'border-t border-slate-100 px-5';
       expenses.forEach((expense) => {
         const row = document.createElement('li');
-        row.className = 'flex items-center justify-between gap-4 border-b border-slate-100/80 py-3 last:border-0';
+        row.className = 'flex flex-wrap items-center justify-between gap-3 border-b border-slate-100/80 py-3 last:border-0';
+        const paymentLabel = document.createElement('label');
+        paymentLabel.className = 'flex min-w-0 items-center gap-2.5';
+        const paymentCheckbox = document.createElement('input');
+        paymentCheckbox.type = 'checkbox';
+        paymentCheckbox.checked = expense.paid;
+        paymentCheckbox.setAttribute('aria-label', `${expense.paid ? 'Marcar como não paga' : 'Marcar como paga'}: ${expense.name}`);
+        paymentCheckbox.className = 'h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600';
+        paymentCheckbox.addEventListener('change', async () => {
+          const previousStatus = !paymentCheckbox.checked;
+          paymentCheckbox.disabled = true;
+          try {
+            const response = await fetch(`/api/transactions/${expense.id}/payment`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({ paid: paymentCheckbox.checked })
+            });
+            if (!response.ok) throw new Error('Não foi possível atualizar o status de pagamento.');
+            await loadDashboard();
+          } catch (error) {
+            paymentCheckbox.checked = previousStatus;
+            const errorBox = document.getElementById('load-error');
+            errorBox.textContent = error.message || 'Erro ao atualizar o status de pagamento.';
+            errorBox.classList.remove('hidden');
+          } finally {
+            paymentCheckbox.disabled = false;
+          }
+        });
         const expenseName = document.createElement('span');
-        expenseName.className = 'truncate text-sm text-slate-500';
+        expenseName.className = 'truncate text-sm text-slate-600';
         expenseName.textContent = expense.name;
+        paymentLabel.append(paymentCheckbox, expenseName);
         const expenseAmount = document.createElement('span');
         expenseAmount.className = 'shrink-0 text-sm font-semibold tabular-nums text-slate-600';
         expenseAmount.textContent = money(expense.totalCents);
-        row.append(expenseName, expenseAmount);
+        const details = document.createElement('div');
+        details.className = 'flex min-w-0 flex-1 items-center justify-between gap-3';
+        details.append(paymentLabel, expenseAmount);
+        row.append(details);
+        if (expense.manual) {
+          const actions = document.createElement('div');
+          actions.className = 'flex shrink-0 items-center gap-2';
+          const editButton = document.createElement('button');
+          editButton.type = 'button';
+          editButton.className = 'rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50';
+          editButton.textContent = 'Editar';
+          editButton.setAttribute('aria-label', `Editar despesa manual: ${expense.name}`);
+          editButton.addEventListener('click', () => openEditExpense(expense));
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.className = 'rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-bold text-rose-700 transition hover:bg-rose-50';
+          deleteButton.textContent = 'Excluir';
+          deleteButton.setAttribute('aria-label', `Excluir despesa manual: ${expense.name}`);
+          deleteButton.addEventListener('click', async () => {
+            if (!window.confirm(`Excluir a despesa manual “${expense.name}”?`)) return;
+            deleteButton.disabled = true;
+            try {
+              const response = await fetch(`/api/transactions/${expense.id}`, { method: 'DELETE' });
+              if (!response.ok) throw new Error(await responseError(response, 'Não foi possível excluir a despesa manual.'));
+              await loadDashboard();
+            } catch (error) {
+              showLoadError(error.message || 'Erro ao excluir a despesa manual.');
+            } finally {
+              deleteButton.disabled = false;
+            }
+          });
+          actions.append(editButton, deleteButton);
+          row.append(actions);
+        }
         list.append(row);
       });
       card.append(list);
@@ -145,14 +295,21 @@
     }
 
     async function loadDashboard() {
+      const requestNumber = ++dashboardRequest;
       const errorBox = document.getElementById('load-error');
+      errorBox.classList.add('hidden');
       try {
-        const response = await fetch('/api/dashboard', { headers: { Accept: 'application/json' } });
+        const query = new URLSearchParams({ month: referenceMonthInput.value });
+        const response = await fetch(`/api/dashboard?${query}`, { headers: { Accept: 'application/json' } });
         if (!response.ok) throw new Error('Não foi possível consultar os dados.');
         const data = await response.json();
+        if (requestNumber !== dashboardRequest) return;
         document.getElementById('income-total').textContent = money(data.incomeCents);
         document.getElementById('expense-total').textContent = money(data.expenseCents);
         document.getElementById('balance-total').textContent = money(data.balanceCents);
+        document.getElementById('paid-total').textContent = money(data.paidCents);
+        document.getElementById('unpaid-total').textContent = money(data.unpaidCents);
+        document.getElementById('remaining-total').textContent = money(data.remainingCents);
 
         const list = document.getElementById('category-list');
         list.replaceChildren();
@@ -170,19 +327,55 @@
         if (!expenseCount) {
           const empty = document.createElement('div');
           empty.className = 'col-span-full rounded-2xl border border-dashed border-slate-200 px-5 py-12 text-center';
-          empty.innerHTML = '<div class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400">—</div><p class="font-semibold text-slate-700">Nenhuma despesa por enquanto</p><p class="mt-1 text-sm text-slate-400">Quando houver lançamentos, eles aparecerão aqui.</p>';
+          empty.innerHTML = '<div class="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400">—</div><p class="font-semibold text-slate-700">Nenhuma despesa neste mês</p><p class="mt-1 text-sm text-slate-400">Quando houver lançamentos para o mês selecionado, eles aparecerão aqui.</p>';
           list.append(empty);
         }
       } catch (error) {
+        if (requestNumber !== dashboardRequest) return;
         document.getElementById('category-list').replaceChildren();
         errorBox.textContent = error.message || 'Erro ao carregar o dashboard.';
         errorBox.classList.remove('hidden');
         document.getElementById('expense-count').textContent = 'Dados indisponíveis';
         document.getElementById('expense-total').textContent = '—';
         document.getElementById('balance-total').textContent = '—';
+        document.getElementById('paid-total').textContent = '—';
+        document.getElementById('unpaid-total').textContent = '—';
+        document.getElementById('remaining-total').textContent = '—';
       }
     }
 
+    document.getElementById('cancel-edit-expense').addEventListener('click', () => editExpenseDialog.close());
+    editExpenseForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const saveButton = document.getElementById('save-edit-expense');
+      const formError = document.getElementById('edit-expense-error');
+      formError.textContent = '';
+      formError.classList.add('hidden');
+      saveButton.disabled = true;
+      const fields = new FormData(editExpenseForm);
+      try {
+        const response = await fetch(`/api/transactions/${editExpenseDialog.dataset.transactionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            title: fields.get('title'),
+            month: fields.get('month'),
+            day: Number(fields.get('day')),
+            amount: fields.get('amount')
+          })
+        });
+        if (!response.ok) throw new Error(await responseError(response, 'Não foi possível atualizar a despesa manual.'));
+        editExpenseDialog.close();
+        await loadDashboard();
+      } catch (error) {
+        formError.textContent = error.message || 'Erro ao atualizar a despesa manual.';
+        formError.classList.remove('hidden');
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    referenceMonthInput.addEventListener('change', loadDashboard);
     loadDashboard();
   </script>
 </body>
