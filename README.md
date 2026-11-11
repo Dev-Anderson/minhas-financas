@@ -47,3 +47,6 @@ go run . --web
 Depois, acesse `http://127.0.0.1:8080` no navegador. O dashboard mostra as entradas zeradas por enquanto, as saídas positivas agrupadas por categoria e por despesa, os lançamentos sem categoria e o saldo (entradas menos saídas). O servidor é somente de leitura e fica restrito à máquina local.
 
 A URL de conexão pode ser alterada em `.env` pela variável `DATABASE_URL`. Os dados do PostgreSQL ficam persistidos no volume Docker `pgdata`. Para parar o banco sem apagar os dados, use `docker compose down`.
+
+## Versão 1.0.0 
+Nessa versão tem as funções básica para funcinoar o projeto
