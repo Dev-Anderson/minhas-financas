@@ -23,8 +23,10 @@ type CategoryGroup struct {
 }
 
 type ExpenseLine struct {
+	ID     int64  `json:"id"`
 	Name   string `json:"name"`
 	Amount string `json:"amount"`
+	Source string `json:"source"`
 }
 
 type Repository interface {

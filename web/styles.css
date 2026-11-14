@@ -144,12 +144,21 @@ input[type="month"] { min-height: 40px; padding: 0 10px; border: 1px solid var(-
 .category-group { padding: 17px 0; border-bottom: 1px solid #eef1ef; }
 .category-group-heading, .category-expense-list li, .category-grand-total { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .category-group-heading h3 { margin: 0; font-size: 13px; font-weight: 800; }
-.category-group-heading strong, .category-expense-list li > span:last-child { white-space: nowrap; }
+.category-group-heading strong, .category-expense-description span:last-child { white-space: nowrap; }
 .category-expense-list { display: grid; gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
 .category-expense-list li { color: #64736a; font-size: 12px; }
-.category-expense-list li > span:first-child { overflow-wrap: anywhere; }
+.category-expense-description { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.category-expense-description span:first-child { overflow-wrap: anywhere; }
+.expense-actions { display: flex; flex-shrink: 0; gap: 6px; }
+.expense-actions .button { min-height: 32px; padding: 0 10px; border-radius: 9px; font-size: 11px; }
 .category-grand-total { padding-top: 17px; color: #26352b; font-size: 13px; }
 .category-grand-total strong { font-size: 18px; }
+.expense-edit-dialog { width: min(calc(100% - 32px), 480px); padding: 24px; border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 20px 60px #10251b44; }
+.expense-edit-dialog::backdrop { background: #10251b66; }
+.expense-edit-dialog h2 { margin: 0 0 18px; font-size: 18px; }
+.expense-edit-fields { display: grid; gap: 14px; }
+.expense-edit-fields .reference-month-select, .expense-edit-fields .category-input { width: 100%; }
+.expense-edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 
 .settings-panel { margin-top: 22px; padding: 24px; }
 .settings-panel h2 { margin: 6px 0 8px; font-size: 18px; letter-spacing: -.02em; }
@@ -161,7 +170,9 @@ input[type="month"] { min-height: 40px; padding: 0 10px; border: 1px solid var(-
 .reference-month-items { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
 .reference-month-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid var(--border); border-radius: 13px; }
 .reference-month-item .category-input { width: 100%; }
-.expense-category-list { margin-top: 20px; }
+.expense-category-filter { max-width: 440px; margin-top: 18px; }
+.expense-category-filter .reference-month-select { width: 100%; }
+.expense-category-list { margin-top: 16px; }
 .expense-category-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .7fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 13px; }
 .expense-category-details { display: grid; gap: 4px; min-width: 0; }
 .expense-category-details strong { overflow-wrap: anywhere; color: #26352b; font-size: 13px; }
@@ -174,10 +185,10 @@ input[type="month"] { min-height: 40px; padding: 0 10px; border: 1px solid var(-
 .danger-button { background: #a63b3b; }
 .danger-button:hover { background: #8d2929; }
 .import-month-select { display: block; margin: 0 0 18px; }
-.manual-expense-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .55fr) auto; align-items: end; gap: 12px; }
+.manual-expense-fields { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) minmax(0, .55fr) auto; align-items: end; gap: 12px; }
 .manual-income-fields { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) minmax(0, .55fr) auto; align-items: end; gap: 12px; }
 .category-input { width: min(100%, 440px); min-height: 42px; padding: 0 12px; border: 1px solid var(--border); border-radius: 11px; color: #26352b; background: #fff; outline: none; }
-.manual-expense-fields .category-input { width: 100%; }
+.manual-expense-fields .category-input, .manual-expense-fields .reference-month-select { width: 100%; }
 .manual-income-fields .category-input, .manual-income-fields .reference-month-select { width: 100%; }
 .field-help { margin-top: 6px; font-size: 10px; }
 .category-input:focus { border-color: #75a688; box-shadow: 0 0 0 3px #75a68824; }
@@ -211,6 +222,10 @@ input[type="month"] { min-height: 40px; padding: 0 10px; border: 1px solid var(-
   .section-heading { align-items: flex-start; flex-direction: column; }
   .count-pill { white-space: normal; }
   .category-expense-list li { align-items: flex-start; }
+  .category-expense-list li { flex-direction: column; }
+  .category-expense-description { width: 100%; }
+  .expense-actions { align-self: flex-end; }
+  .expense-edit-dialog { padding: 20px; }
 }
 
 @media (max-width: 420px) {
@@ -232,3 +247,67 @@ input[type="month"] { min-height: 40px; padding: 0 10px; border: 1px solid var(-
   .manual-expense-fields { grid-template-columns: 1fr; gap: 14px; }
   .manual-income-fields { grid-template-columns: 1fr; gap: 14px; }
 }
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e4ece6;
+  background: #111914;
+  --green: #2d7047;
+  --muted: #a2afa6;
+  --border: #39463d;
+}
+
+html[data-theme="dark"] body { background: #111914; }
+html[data-theme="dark"] .eyebrow { color: #79c796; }
+html[data-theme="dark"] .button:not(.secondary-button):not(.danger-button) { background: #2d7047; }
+html[data-theme="dark"] .button:not(.secondary-button):not(.danger-button):hover { background: #3a8054; }
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .small-card,
+html[data-theme="dark"] .status-pill { background: #1a241d; }
+html[data-theme="dark"] .status-pill { color: #c0ccc3; }
+html[data-theme="dark"] .reference-month-select,
+html[data-theme="dark"] input[type="month"],
+html[data-theme="dark"] .category-input {
+  border-color: #435248;
+  color: #e4ece6;
+  background: #131c16;
+}
+html[data-theme="dark"] .category-label { color: #c2cec5; }
+html[data-theme="dark"] .category-input::placeholder { color: #839087; }
+html[data-theme="dark"] .income-card {
+  border-color: #28583c;
+  color: #7be0a4;
+  background: linear-gradient(135deg, #192e21, #1b3826);
+}
+html[data-theme="dark"] .expense-card {
+  border-color: #693b3b;
+  color: #ff9a91;
+  background: linear-gradient(135deg, #332020, #3b2220);
+}
+html[data-theme="dark"] .card-icon { background: #263229; }
+html[data-theme="dark"] .paid { border-color: #2d5a41; color: #62d39b; }
+html[data-theme="dark"] .unpaid { border-color: #62472b; color: #f0ad62; }
+html[data-theme="dark"] .remaining { border-color: #633742; color: #f07892; }
+html[data-theme="dark"] .section-heading,
+html[data-theme="dark"] .category-group { border-color: #303b33; }
+html[data-theme="dark"] .section-heading .eyebrow { color: #9aacc2; }
+html[data-theme="dark"] .count-pill { color: #c0ccd5; background: #28333b; }
+html[data-theme="dark"] .category-expense-list li { color: #c0ccc3; }
+html[data-theme="dark"] .category-grand-total { color: #e4ece6; }
+html[data-theme="dark"] .expense-category-details strong { color: #e4ece6; }
+html[data-theme="dark"] .expense-source { color: #a2afa6; }
+html[data-theme="dark"] .reference-month-item,
+html[data-theme="dark"] .expense-category-item { border-color: #39463d; background: #202b23; }
+html[data-theme="dark"] .reference-month-empty { background: #202b23; }
+html[data-theme="dark"] .secondary-button { color: #cde2d2; background: #293c2e; }
+html[data-theme="dark"] .secondary-button:hover { color: #fff; background: #356447; }
+html[data-theme="dark"] .danger-button { background: #973b3b; }
+html[data-theme="dark"] .danger-button:hover { background: #b74949; }
+html[data-theme="dark"] .upload-box { border-color: #425648; background: #18241b; }
+html[data-theme="dark"] .file-button { color: #cde2d2; background: #293c2e; }
+html[data-theme="dark"] .file-name { color: #c0ccc3; }
+html[data-theme="dark"] .notice.success { color: #a3e2b9; background: #1e3827; }
+html[data-theme="dark"] .notice.error { color: #ffb6ae; background: #442525; }
+html[data-theme="dark"] .back-link { color: #c0ccc3; }
+html[data-theme="dark"] .back-link:hover { color: #a3e2b9; }
+html[data-theme="dark"] .expense-edit-dialog { border-color: #39463d; color: #e4ece6; background: #1a241d; }

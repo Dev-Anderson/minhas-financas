@@ -85,6 +85,7 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		{version: 5, filename: "migrations/005_expense_categories.sql"},
 		{version: 6, filename: "migrations/006_nubank_categories.sql"},
 		{version: 7, filename: "migrations/007_income_reference_month.sql"},
+		{version: 8, filename: "migrations/008_expense_reference_month.sql"},
 	} {
 		var applied bool
 		if err := tx.QueryRow(ctx,
@@ -162,13 +163,18 @@ func (s *Store) ListCategories(ctx context.Context) ([]category.Category, error)
 	return categories, nil
 }
 
-func (s *Store) CreateExpense(ctx context.Context, name, amount string) (expense.Expense, error) {
+func (s *Store) CreateExpense(ctx context.Context, referenceMonthID int64, name, amount string) (expense.Expense, error) {
 	var created expense.Expense
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO expense (name, valor)
-		VALUES ($1, $2)
-		RETURNING id, name, valor::text
-	`, name, amount).Scan(&created.ID, &created.Name, &created.Valor)
+		INSERT INTO expense (id_mes_ref, name, valor)
+		SELECT id, $2, $3
+		FROM mes_ref
+		WHERE id = $1 AND date_delete IS NULL
+		RETURNING id, name, valor::text, id_mes_ref
+	`, referenceMonthID, name, amount).Scan(&created.ID, &created.Name, &created.Valor, &created.ReferenceMonthID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return expense.Expense{}, expense.ErrReferenceMonthNotFound
+	}
 	if err != nil {
 		return expense.Expense{}, fmt.Errorf("create expense: %w", err)
 	}
@@ -194,19 +200,24 @@ func (s *Store) CreateIncome(ctx context.Context, referenceMonthID int64, name, 
 	return created, nil
 }
 
-func (s *Store) ListExpenses(ctx context.Context) ([]expense.Expense, error) {
+func (s *Store) ListExpenses(ctx context.Context, referenceMonthID *int64) ([]expense.Expense, error) {
+	var monthID pgtype.Int8
+	if referenceMonthID != nil {
+		monthID = pgtype.Int8{Int64: *referenceMonthID, Valid: true}
+	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, name, valor, id_category, source
 		FROM (
 			SELECT id, name, valor::text AS valor, id_category, 'manual'::text AS source
 			FROM expense
-			WHERE date_delete IS NULL
+			WHERE date_delete IS NULL AND ($1::bigint IS NULL OR id_mes_ref = $1)
 			UNION ALL
 			SELECT id, title AS name, amount::text AS valor, id_category, 'nubank'::text AS source
 			FROM nubank
+			WHERE $1::bigint IS NULL OR id_mes_ref = $1
 		) all_expenses
 		ORDER BY LOWER(name), source, id
-	`)
+	`, monthID)
 	if err != nil {
 		return nil, fmt.Errorf("list expenses: %w", err)
 	}
@@ -230,6 +241,63 @@ func (s *Store) ListExpenses(ctx context.Context) ([]expense.Expense, error) {
 	return expenses, nil
 }
 
+func (s *Store) UpdateExpense(ctx context.Context, expenseID, referenceMonthID int64, name, amount string) (expense.Expense, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return expense.Expense{}, fmt.Errorf("begin manual expense update: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var activeMonthID int64
+	if err := tx.QueryRow(ctx, `
+		SELECT id FROM mes_ref
+		WHERE id = $1 AND date_delete IS NULL
+		FOR SHARE
+	`, referenceMonthID).Scan(&activeMonthID); errors.Is(err, pgx.ErrNoRows) {
+		return expense.Expense{}, expense.ErrReferenceMonthNotFound
+	} else if err != nil {
+		return expense.Expense{}, fmt.Errorf("validate reference month for expense update: %w", err)
+	}
+
+	var updated expense.Expense
+	err = tx.QueryRow(ctx, `
+		UPDATE expense
+		SET id_mes_ref = $2, name = $3, valor = $4, date_update = CURRENT_TIMESTAMP
+		WHERE id = $1 AND date_delete IS NULL
+		RETURNING id, name, valor::text, id_mes_ref
+	`, expenseID, referenceMonthID, name, amount).Scan(
+		&updated.ID, &updated.Name, &updated.Valor, &updated.ReferenceMonthID,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return expense.Expense{}, expense.ErrNotFound
+	}
+	if err != nil {
+		return expense.Expense{}, fmt.Errorf("update manual expense: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return expense.Expense{}, fmt.Errorf("commit manual expense update: %w", err)
+	}
+	updated.Source = expense.SourceManual
+	return updated, nil
+}
+
+func (s *Store) DeleteExpense(ctx context.Context, expenseID int64) error {
+	result, err := s.pool.Exec(ctx, `
+		UPDATE expense
+		SET date_delete = CURRENT_TIMESTAMP, date_update = CURRENT_TIMESTAMP
+		WHERE id = $1 AND date_delete IS NULL
+	`, expenseID)
+	if err != nil {
+		return fmt.Errorf("delete manual expense: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return expense.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) Summary(ctx context.Context, referenceMonthID int64) (dashboard.Summary, error) {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel:   pgx.RepeatableRead,
@@ -246,12 +314,22 @@ func (s *Store) Summary(ctx context.Context, referenceMonthID int64) (dashboard.
 	err = tx.QueryRow(ctx, `
 		SELECT
 			COALESCE((SELECT SUM(e.valor) FROM entrada e WHERE e.id_mes_ref = mr.id AND e.date_delete IS NULL), 0)::text,
-			COALESCE(SUM(n.amount), 0)::text,
+			(COALESCE(SUM(n.amount), 0) + COALESCE((
+				SELECT SUM(e.valor) FROM expense e
+				WHERE e.id_mes_ref = mr.id AND e.date_delete IS NULL
+			), 0))::text,
 			(
 				COALESCE((SELECT SUM(e.valor) FROM entrada e WHERE e.id_mes_ref = mr.id AND e.date_delete IS NULL), 0)
 				- COALESCE(SUM(n.amount), 0)
+				- COALESCE((
+					SELECT SUM(e.valor) FROM expense e
+					WHERE e.id_mes_ref = mr.id AND e.date_delete IS NULL
+				), 0)
 			)::text,
-			COUNT(n.id)::integer
+			(COUNT(n.id) + (
+				SELECT COUNT(*) FROM expense e
+				WHERE e.id_mes_ref = mr.id AND e.date_delete IS NULL
+			))::integer
 		FROM mes_ref mr
 		LEFT JOIN nubank n ON n.id_mes_ref = mr.id
 		WHERE mr.id = $1 AND mr.date_delete IS NULL
@@ -265,16 +343,24 @@ func (s *Store) Summary(ctx context.Context, referenceMonthID int64) (dashboard.
 	}
 
 	rows, err := tx.Query(ctx, `
+		WITH all_expenses AS (
+			SELECT id, id_category, title AS name, amount, date AS sort_date, 'nubank'::text AS source
+			FROM nubank
+			WHERE id_mes_ref = $1
+			UNION ALL
+			SELECT id, id_category, name, valor AS amount, date_create AS sort_date, 'manual'::text AS source
+			FROM expense
+			WHERE id_mes_ref = $1 AND date_delete IS NULL
+		)
 		SELECT
 			COALESCE(c.name, 'Sem categoria') AS category_name,
-			SUM(n.amount)::text AS category_total,
+			SUM(e.amount)::text AS category_total,
 			json_agg(
-				json_build_object('name', n.title, 'amount', n.amount::text)
-				ORDER BY n.date, n.id
+				json_build_object('id', e.id, 'name', e.name, 'amount', e.amount::text, 'source', e.source)
+				ORDER BY e.sort_date, e.id
 			)::text AS expenses
-		FROM nubank n
-		LEFT JOIN category c ON c.id = n.id_category AND c.date_delete IS NULL
-		WHERE n.id_mes_ref = $1
+		FROM all_expenses e
+		LEFT JOIN category c ON c.id = e.id_category AND c.date_delete IS NULL
 		GROUP BY c.id, c.name
 		ORDER BY category_name
 	`, referenceMonthID)

@@ -51,31 +51,52 @@ func (db fakeDatabase) Summary(context.Context, int64) (dashboard.Summary, error
 }
 
 type fakeExpenseRepository struct {
-	expense    expense.Expense
-	expenses   []expense.Expense
-	err        error
-	updated    int64
-	expenseID  int64
-	categoryID int64
-	source     string
+	expense        expense.Expense
+	expenses       []expense.Expense
+	err            error
+	updated        int64
+	expenseID      int64
+	categoryID     int64
+	source         string
+	updatedExpense expense.Expense
+	deletedID      int64
+	listedMonthID  *int64
 }
 
-func (r fakeExpenseRepository) CreateExpense(_ context.Context, name, amount string) (expense.Expense, error) {
+func (r fakeExpenseRepository) CreateExpense(_ context.Context, referenceMonthID int64, name, amount string) (expense.Expense, error) {
 	if r.err != nil {
 		return expense.Expense{}, r.err
 	}
 	created := r.expense
 	created.Name = name
 	created.Valor = amount
+	created.ReferenceMonthID = referenceMonthID
 	created.Source = expense.SourceManual
 	return created, nil
 }
 
-func (r *fakeExpenseRepository) ListExpenses(context.Context) ([]expense.Expense, error) {
+func (r *fakeExpenseRepository) ListExpenses(_ context.Context, referenceMonthID *int64) ([]expense.Expense, error) {
+	r.listedMonthID = referenceMonthID
 	if r.expenses != nil {
 		return r.expenses, nil
 	}
 	return []expense.Expense{r.expense}, nil
+}
+
+func (r *fakeExpenseRepository) UpdateExpense(_ context.Context, expenseID, referenceMonthID int64, name, amount string) (expense.Expense, error) {
+	r.expenseID = expenseID
+	if r.err != nil {
+		return expense.Expense{}, r.err
+	}
+	r.updatedExpense = expense.Expense{
+		ID: expenseID, Name: name, Valor: amount, ReferenceMonthID: referenceMonthID, Source: expense.SourceManual,
+	}
+	return r.updatedExpense, nil
+}
+
+func (r *fakeExpenseRepository) DeleteExpense(_ context.Context, expenseID int64) error {
+	r.deletedID = expenseID
+	return r.err
 }
 
 func (r *fakeExpenseRepository) AssignCategory(_ context.Context, expenseID, categoryID int64, source string) (int64, error) {
@@ -153,12 +174,22 @@ func (fakeCategoryRepository) ListCategories(context.Context) ([]category.Catego
 
 type fakeExpenseServiceRepository struct{}
 
-func (fakeExpenseServiceRepository) CreateExpense(_ context.Context, name, amount string) (expense.Expense, error) {
-	return expense.Expense{Name: name, Valor: amount, Source: expense.SourceManual}, nil
+func (fakeExpenseServiceRepository) CreateExpense(_ context.Context, referenceMonthID int64, name, amount string) (expense.Expense, error) {
+	return expense.Expense{Name: name, Valor: amount, ReferenceMonthID: referenceMonthID, Source: expense.SourceManual}, nil
 }
 
-func (fakeExpenseServiceRepository) ListExpenses(context.Context) ([]expense.Expense, error) {
+func (fakeExpenseServiceRepository) ListExpenses(context.Context, *int64) ([]expense.Expense, error) {
 	return []expense.Expense{}, nil
+}
+
+func (fakeExpenseServiceRepository) UpdateExpense(_ context.Context, expenseID, referenceMonthID int64, name, amount string) (expense.Expense, error) {
+	return expense.Expense{
+		ID: expenseID, ReferenceMonthID: referenceMonthID, Name: name, Valor: amount, Source: expense.SourceManual,
+	}, nil
+}
+
+func (fakeExpenseServiceRepository) DeleteExpense(context.Context, int64) error {
+	return nil
 }
 
 func (fakeExpenseServiceRepository) AssignCategory(context.Context, int64, int64, string) (int64, error) {
@@ -431,7 +462,7 @@ func TestCreateCategoryEndpointReportsDuplicate(t *testing.T) {
 func TestCreateExpenseEndpoint(t *testing.T) {
 	setGinTestMode(t)
 
-	request := httptest.NewRequest(http.MethodPost, "/api/expenses", strings.NewReader(`{"name":"  Mercado  ","valor":"1.234,56"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/expenses", strings.NewReader(`{"referenceMonthId":7,"name":"  Mercado  ","valor":"1.234,56"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 	repository := &fakeExpenseRepository{expense: expense.Expense{ID: 8}}
@@ -440,8 +471,114 @@ func TestCreateExpenseEndpoint(t *testing.T) {
 	if response.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, response.Code, response.Body.String())
 	}
-	if response.Body.String() != "{\"id\":8,\"name\":\"Mercado\",\"valor\":\"1234.56\",\"categoryId\":null,\"source\":\"manual\"}" {
+	if response.Body.String() != "{\"id\":8,\"name\":\"Mercado\",\"valor\":\"1234.56\",\"referenceMonthId\":7,\"categoryId\":null,\"source\":\"manual\"}" {
 		t.Fatalf("unexpected response body %q", response.Body.String())
+	}
+}
+
+func TestUpdateExpenseEndpoint(t *testing.T) {
+	setGinTestMode(t)
+	repository := &fakeExpenseRepository{}
+	router := newHandler(
+		fakeDatabase{},
+		&fakeImporter{},
+		category.NewService(fakeCategoryRepository{}),
+		expense.NewService(repository),
+		income.NewService(&fakeIncomeRepository{}),
+		dashboard.NewService(fakeDatabase{}),
+		fakeReferenceMonthManager{},
+	)
+	request := httptest.NewRequest(http.MethodPatch, "/api/expenses/8", strings.NewReader(
+		`{"referenceMonthId":7,"name":" Mercado ","valor":"1.234,5"}`,
+	))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, response.Code, response.Body.String())
+	}
+	if response.Body.String() != "{\"id\":8,\"name\":\"Mercado\",\"valor\":\"1234.50\",\"referenceMonthId\":7,\"categoryId\":null,\"source\":\"manual\"}" {
+		t.Fatalf("unexpected response body %q", response.Body.String())
+	}
+	if repository.updatedExpense.ID != 8 || repository.updatedExpense.ReferenceMonthID != 7 {
+		t.Fatalf("unexpected updated expense: %#v", repository.updatedExpense)
+	}
+}
+
+func TestUpdateExpenseEndpointRejectsInvalidAndMissingExpenses(t *testing.T) {
+	setGinTestMode(t)
+	tests := []struct {
+		name       string
+		path       string
+		body       string
+		repository *fakeExpenseRepository
+		wantStatus int
+	}{
+		{name: "invalid ID", path: "/api/expenses/invalid", wantStatus: http.StatusBadRequest},
+		{name: "invalid data", path: "/api/expenses/8", body: `{"referenceMonthId":7,"name":" ","valor":"10,00"}`, wantStatus: http.StatusBadRequest},
+		{name: "missing expense", path: "/api/expenses/8", body: `{"referenceMonthId":7,"name":"Mercado","valor":"10,00"}`, repository: &fakeExpenseRepository{err: expense.ErrNotFound}, wantStatus: http.StatusNotFound},
+		{name: "missing month", path: "/api/expenses/8", body: `{"referenceMonthId":7,"name":"Mercado","valor":"10,00"}`, repository: &fakeExpenseRepository{err: expense.ErrReferenceMonthNotFound}, wantStatus: http.StatusNotFound},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := test.repository
+			if repository == nil {
+				repository = &fakeExpenseRepository{}
+			}
+			router := newHandler(
+				fakeDatabase{},
+				&fakeImporter{},
+				category.NewService(fakeCategoryRepository{}),
+				expense.NewService(repository),
+				income.NewService(&fakeIncomeRepository{}),
+				dashboard.NewService(fakeDatabase{}),
+				fakeReferenceMonthManager{},
+			)
+			request := httptest.NewRequest(http.MethodPatch, test.path, strings.NewReader(test.body))
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != test.wantStatus {
+				t.Fatalf("expected status %d, got %d: %s", test.wantStatus, response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestDeleteExpenseEndpoint(t *testing.T) {
+	setGinTestMode(t)
+	repository := &fakeExpenseRepository{}
+	router := newHandler(
+		fakeDatabase{},
+		&fakeImporter{},
+		category.NewService(fakeCategoryRepository{}),
+		expense.NewService(repository),
+		income.NewService(&fakeIncomeRepository{}),
+		dashboard.NewService(fakeDatabase{}),
+		fakeReferenceMonthManager{},
+	)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/expenses/8", nil))
+
+	if response.Code != http.StatusNoContent || repository.deletedID != 8 {
+		t.Fatalf("unexpected delete response: status=%d body=%s deletedID=%d", response.Code, response.Body.String(), repository.deletedID)
+	}
+
+	repository = &fakeExpenseRepository{err: expense.ErrNotFound}
+	router = newHandler(
+		fakeDatabase{},
+		&fakeImporter{},
+		category.NewService(fakeCategoryRepository{}),
+		expense.NewService(repository),
+		income.NewService(&fakeIncomeRepository{}),
+		dashboard.NewService(fakeDatabase{}),
+		fakeReferenceMonthManager{},
+	)
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodDelete, "/api/expenses/8", nil))
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("expected missing expense status %d, got %d: %s", http.StatusNotFound, response.Code, response.Body.String())
 	}
 }
 
@@ -472,11 +609,26 @@ func TestExpenseCategoryEndpoints(t *testing.T) {
 	}
 
 	response = httptest.NewRecorder()
-	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/expenses", nil))
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/expenses?referenceMonthId=7", nil))
 	if response.Code != http.StatusOK ||
 		!strings.Contains(response.Body.String(), `"source":"manual"`) ||
 		!strings.Contains(response.Body.String(), `"source":"nubank"`) {
 		t.Fatalf("unexpected expense list response: status=%d body=%s", response.Code, response.Body.String())
+	}
+	if repository.listedMonthID == nil || *repository.listedMonthID != 7 {
+		t.Fatalf("expected expense list to use reference month 7, got %v", repository.listedMonthID)
+	}
+
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/expenses?referenceMonthId=invalid", nil))
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid month status %d, got %d", http.StatusBadRequest, response.Code)
+	}
+
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/expenses", nil))
+	if response.Code != http.StatusOK || repository.listedMonthID != nil {
+		t.Fatalf("unexpected unfiltered expense list response: status=%d month=%v", response.Code, repository.listedMonthID)
 	}
 
 	request := httptest.NewRequest(http.MethodPatch, "/api/expenses/8/category", strings.NewReader(`{"categoryId":3,"source":"nubank"}`))
@@ -574,8 +726,9 @@ func TestCreateExpenseEndpointRejectsInvalidRequests(t *testing.T) {
 		body string
 	}{
 		{name: "invalid JSON", body: `{"name":`},
-		{name: "empty name", body: `{"name":"  ","valor":"10,00"}`},
-		{name: "invalid amount", body: `{"name":"Mercado","valor":"-10,00"}`},
+		{name: "missing month", body: `{"name":"Mercado","valor":"10,00"}`},
+		{name: "empty name", body: `{"referenceMonthId":1,"name":"  ","valor":"10,00"}`},
+		{name: "invalid amount", body: `{"referenceMonthId":1,"name":"Mercado","valor":"-10,00"}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -588,6 +741,29 @@ func TestCreateExpenseEndpointRejectsInvalidRequests(t *testing.T) {
 				t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, response.Code, response.Body.String())
 			}
 		})
+	}
+}
+
+func TestCreateExpenseEndpointReturnsNotFoundForUnknownReferenceMonth(t *testing.T) {
+	setGinTestMode(t)
+	request := httptest.NewRequest(http.MethodPost, "/api/expenses", strings.NewReader(
+		`{"referenceMonthId":7,"name":"Mercado","valor":"10,00"}`,
+	))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router := newHandler(
+		fakeDatabase{},
+		&fakeImporter{},
+		category.NewService(fakeCategoryRepository{}),
+		expense.NewService(&fakeExpenseRepository{err: expense.ErrReferenceMonthNotFound}),
+		income.NewService(&fakeIncomeRepository{}),
+		dashboard.NewService(fakeDatabase{}),
+		fakeReferenceMonthManager{},
+	)
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNotFound, response.Code, response.Body.String())
 	}
 }
 

@@ -86,8 +86,10 @@ type categoryCreator interface {
 }
 
 type expenseCreator interface {
-	Create(context.Context, string, string) (expense.Expense, error)
-	List(context.Context) ([]expense.Expense, error)
+	Create(context.Context, int64, string, string) (expense.Expense, error)
+	List(context.Context, *int64) ([]expense.Expense, error)
+	Update(context.Context, int64, int64, string, string) (expense.Expense, error)
+	Delete(context.Context, int64) error
 	AssignCategory(context.Context, int64, int64, string) (int64, error)
 }
 
@@ -115,8 +117,9 @@ type referenceMonthRequest struct {
 }
 
 type expenseRequest struct {
-	Name  string `json:"name"`
-	Valor string `json:"valor"`
+	ReferenceMonthID int64  `json:"referenceMonthId"`
+	Name             string `json:"name"`
+	Valor            string `json:"valor"`
 }
 
 type incomeRequest struct {
@@ -355,9 +358,15 @@ func newHandler(
 			return
 		}
 
-		created, err := expenses.Create(c.Request.Context(), request.Name, request.Valor)
-		if errors.Is(err, expense.ErrInvalidName) || errors.Is(err, expense.ErrInvalidAmount) {
+		created, err := expenses.Create(c.Request.Context(), request.ReferenceMonthID, request.Name, request.Valor)
+		if errors.Is(err, expense.ErrInvalidReferenceMonth) ||
+			errors.Is(err, expense.ErrInvalidName) ||
+			errors.Is(err, expense.ErrInvalidAmount) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if errors.Is(err, expense.ErrReferenceMonthNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
 		if err != nil {
@@ -366,6 +375,49 @@ func newHandler(
 			return
 		}
 		c.JSON(http.StatusCreated, created)
+	})
+	router.PATCH("/api/expenses/:id", func(c *gin.Context) {
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil || id < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid expense ID"})
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4<<10)
+		var request expenseRequest
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "request body must contain a reference month, expense name, and amount"})
+			return
+		}
+		updated, err := expenses.Update(c.Request.Context(), id, request.ReferenceMonthID, request.Name, request.Valor)
+		switch {
+		case errors.Is(err, expense.ErrInvalidReferenceMonth),
+			errors.Is(err, expense.ErrInvalidName),
+			errors.Is(err, expense.ErrInvalidAmount):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		case errors.Is(err, expense.ErrNotFound),
+			errors.Is(err, expense.ErrReferenceMonthNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case err != nil:
+			log.Printf("update manual expense: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not update manual expense"})
+		default:
+			c.JSON(http.StatusOK, updated)
+		}
+	})
+	router.DELETE("/api/expenses/:id", func(c *gin.Context) {
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil || id < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid expense ID"})
+			return
+		}
+		if err := expenses.Delete(c.Request.Context(), id); errors.Is(err, expense.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else if err != nil {
+			log.Printf("delete manual expense: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete manual expense"})
+		} else {
+			c.Status(http.StatusNoContent)
+		}
 	})
 	router.POST("/api/incomes", func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4<<10)
@@ -390,7 +442,20 @@ func newHandler(
 		}
 	})
 	router.GET("/api/expenses", func(c *gin.Context) {
-		items, err := expenses.List(c.Request.Context())
+		var referenceMonthID *int64
+		if value, provided := c.GetQuery("referenceMonthId"); provided {
+			parsedID, err := strconv.ParseInt(value, 10, 64)
+			if err != nil || parsedID < 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "a valid reference month must be selected"})
+				return
+			}
+			referenceMonthID = &parsedID
+		}
+		items, err := expenses.List(c.Request.Context(), referenceMonthID)
+		if errors.Is(err, expense.ErrInvalidReferenceMonth) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if err != nil {
 			log.Printf("list expenses: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not list expenses"})

@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f7f5">
   <title>Configurações · Minhas Finanças</title>
+  <script>
+    if (localStorage.getItem('minhas-financas-theme') === 'dark') {
+      document.documentElement.dataset.theme = 'dark';
+      document.querySelector('meta[name="theme-color"]').content = '#111914';
+    }
+  </script>
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
@@ -145,10 +151,16 @@
     <section class="panel settings-panel" aria-labelledby="expense-title">
       <p class="eyebrow">Lançamentos</p>
       <h2 id="expense-title">Cadastrar despesa manual</h2>
-      <p class="subtle">Registre uma despesa que não veio do arquivo de extrato. O valor deve ser positivo e informado em reais.</p>
+      <p class="subtle">Registre uma despesa que não veio do arquivo de extrato e associe-a a um mês de referência.</p>
 
       <form id="expense-form" class="category-form">
         <div class="manual-expense-fields">
+          <div>
+            <label class="category-label" for="expense-reference-month">Mês de referência</label>
+            <select class="reference-month-select" id="expense-reference-month" name="referenceMonthId" required disabled>
+              <option value="">Carregando meses…</option>
+            </select>
+          </div>
           <div>
             <label class="category-label" for="expense-name">Descrição</label>
             <input
@@ -176,7 +188,7 @@
               required
             >
           </div>
-          <button class="button" id="submit-expense" type="submit">Cadastrar despesa</button>
+          <button class="button" id="submit-expense" type="submit" disabled>Cadastrar despesa</button>
         </div>
         <div class="notice" id="expense-notice" role="status" aria-live="polite"></div>
       </form>
@@ -185,7 +197,13 @@
     <section class="panel settings-panel" aria-labelledby="expense-category-title">
       <p class="eyebrow">Organização</p>
       <h2 id="expense-category-title">Vincular despesas a categorias</h2>
-      <p class="subtle">Escolha uma categoria para cada despesa. Despesas com o mesmo nome compartilham a mesma categoria, mesmo quando têm valores diferentes.</p>
+      <p class="subtle">Filtre por mês para encontrar as despesas. A categoria vinculada a um nome também é aplicada às despesas com o mesmo nome em outros meses.</p>
+      <div class="expense-category-filter">
+        <label class="category-label" for="expense-category-reference-month">Mês de referência</label>
+        <select class="reference-month-select" id="expense-category-reference-month" name="referenceMonthId" aria-label="Filtrar despesas por mês de referência" required disabled>
+          <option value="">Carregando meses…</option>
+        </select>
+      </div>
       <div class="expense-category-list" id="expense-category-list" aria-live="polite">
         <p class="subtle">Carregando categorias e despesas…</p>
       </div>
@@ -200,6 +218,8 @@
     const notice = document.getElementById('import-notice');
     const importMonthSelect = document.getElementById('import-reference-month');
     const incomeMonthSelect = document.getElementById('income-reference-month');
+    const expenseMonthSelect = document.getElementById('expense-reference-month');
+    const expenseCategoryMonthSelect = document.getElementById('expense-category-reference-month');
     const referenceMonthForm = document.getElementById('reference-month-form');
     const referenceMonthInput = document.getElementById('reference-month-name');
     const referenceMonthButton = document.getElementById('submit-reference-month');
@@ -228,22 +248,39 @@
       renderReferenceMonths(months);
       importMonthSelect.replaceChildren();
       incomeMonthSelect.replaceChildren();
+      expenseMonthSelect.replaceChildren();
+      expenseCategoryMonthSelect.replaceChildren();
       if (months.length === 0) {
         importMonthSelect.add(new Option('Cadastre um mês de referência primeiro', ''));
         incomeMonthSelect.add(new Option('Cadastre um mês de referência primeiro', ''));
+        expenseMonthSelect.add(new Option('Cadastre um mês de referência primeiro', ''));
+        expenseCategoryMonthSelect.add(new Option('Cadastre um mês de referência primeiro', ''));
         importMonthSelect.disabled = true;
         incomeMonthSelect.disabled = true;
+        expenseMonthSelect.disabled = true;
+        expenseCategoryMonthSelect.disabled = true;
       } else {
         importMonthSelect.add(new Option('Selecione o mês de referência', ''));
         incomeMonthSelect.add(new Option('Selecione o mês de referência', ''));
+        expenseMonthSelect.add(new Option('Selecione o mês de referência', ''));
+        expenseCategoryMonthSelect.add(new Option('Selecione o mês de referência', ''));
         months.forEach((month) => {
           importMonthSelect.add(new Option(month.name, month.id));
           incomeMonthSelect.add(new Option(month.name, month.id));
+          expenseMonthSelect.add(new Option(month.name, month.id));
+          expenseCategoryMonthSelect.add(new Option(month.name, month.id));
         });
         importMonthSelect.disabled = false;
         incomeMonthSelect.disabled = false;
+        expenseMonthSelect.disabled = false;
+        expenseCategoryMonthSelect.disabled = false;
+        expenseCategoryMonthSelect.value = String(months[0].id);
       }
       validateSelection();
+      expenseButton.disabled = expenseMonthSelect.disabled || !expenseMonthSelect.value;
+      loadExpenseCategories().catch((error) => {
+        expenseCategoryList.textContent = error.message || 'Não foi possível carregar as categorias e despesas.';
+      });
     }
 
     function renderReferenceMonths(months) {
@@ -449,6 +486,7 @@
     const expenseCategoryList = document.getElementById('expense-category-list');
     const expenseCategoryNotice = document.getElementById('expense-category-notice');
     let availableCategories = [];
+    let expenseCategoryLoad = 0;
 
     const incomeForm = document.getElementById('income-form');
     const incomeButton = document.getElementById('submit-income');
@@ -496,17 +534,23 @@
       incomeButton.disabled = incomeMonthSelect.disabled || !incomeMonthSelect.value;
     });
 
+    expenseMonthSelect.addEventListener('change', () => {
+      expenseButton.disabled = expenseMonthSelect.disabled || !expenseMonthSelect.value;
+    });
+
     expenseForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const values = new FormData(expenseForm);
+      const referenceMonthID = values.get('referenceMonthId');
       const name = values.get('name').trim();
       const amount = values.get('valor').trim();
-      if (!name || !amount) {
-        expenseNotice.textContent = 'Informe a descrição e o valor da despesa.';
+      if (!referenceMonthID || !name || !amount) {
+        expenseNotice.textContent = 'Selecione o mês de referência e informe a descrição e o valor da despesa.';
         expenseNotice.className = 'notice visible error';
         return;
       }
 
+      const monthName = expenseMonthSelect.options[expenseMonthSelect.selectedIndex].text;
       expenseButton.disabled = true;
       expenseButton.textContent = 'Cadastrando…';
       expenseNotice.className = 'notice';
@@ -514,13 +558,13 @@
         const response = await fetch('/api/expenses', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ name, valor: amount })
+          body: JSON.stringify({ referenceMonthId: Number(referenceMonthID), name, valor: amount })
         });
         const result = await response.json();
         if (!response.ok) {
           throw new Error(result.error || 'Não foi possível cadastrar a despesa.');
         }
-        expenseNotice.textContent = `Despesa “${result.name}” cadastrada no valor de ${Number(result.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`;
+        expenseNotice.textContent = `Despesa “${result.name}” cadastrada no valor de ${Number(result.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para “${monthName}”.`;
         expenseNotice.className = 'notice visible success';
         expenseForm.reset();
         loadExpenseCategories().catch((error) => {
@@ -530,7 +574,7 @@
         expenseNotice.textContent = error.message || 'Não foi possível cadastrar a despesa.';
         expenseNotice.className = 'notice visible error';
       } finally {
-        expenseButton.disabled = false;
+        expenseButton.disabled = expenseMonthSelect.disabled || !expenseMonthSelect.value;
         expenseButton.textContent = 'Cadastrar despesa';
       }
     });
@@ -541,12 +585,26 @@
     }
 
     async function loadExpenseCategories() {
-      const [categories, expenses] = await Promise.all([
-        requestJSON('/api/categories'),
-        requestJSON('/api/expenses')
-      ]);
-      availableCategories = categories;
-      renderExpenseCategories(expenses);
+      const requestNumber = ++expenseCategoryLoad;
+      const referenceMonthID = expenseCategoryMonthSelect.value;
+      if (!referenceMonthID) {
+        expenseCategoryList.textContent = expenseCategoryMonthSelect.disabled
+          ? 'Cadastre um mês de referência para ver as despesas.'
+          : 'Selecione um mês de referência para ver as despesas.';
+        return;
+      }
+      try {
+        const [categories, expenses] = await Promise.all([
+          requestJSON('/api/categories'),
+          requestJSON(`/api/expenses?referenceMonthId=${encodeURIComponent(referenceMonthID)}`)
+        ]);
+        if (requestNumber !== expenseCategoryLoad || referenceMonthID !== expenseCategoryMonthSelect.value) return;
+        availableCategories = categories;
+        renderExpenseCategories(expenses);
+      } catch (error) {
+        if (requestNumber !== expenseCategoryLoad) return;
+        throw error;
+      }
     }
 
     function renderExpenseCategories(expenses) {
@@ -554,7 +612,7 @@
       if (expenses.length === 0) {
         const empty = document.createElement('p');
         empty.className = 'subtle reference-month-empty';
-        empty.textContent = 'Nenhuma despesa cadastrada.';
+        empty.textContent = 'Nenhuma despesa cadastrada para este mês de referência.';
         expenseCategoryList.append(empty);
         return;
       }
@@ -625,8 +683,10 @@
     }
 
     importMonthSelect.addEventListener('change', validateSelection);
-    loadExpenseCategories().catch((error) => {
-      expenseCategoryList.textContent = error.message || 'Não foi possível carregar as categorias e despesas.';
+    expenseCategoryMonthSelect.addEventListener('change', () => {
+      loadExpenseCategories().catch((error) => {
+        expenseCategoryList.textContent = error.message || 'Não foi possível carregar as categorias e despesas.';
+      });
     });
     loadReferenceMonths().catch((error) => {
       referenceMonthList.textContent = error.message || 'Não foi possível carregar os meses de referência.';
@@ -634,6 +694,12 @@
       importMonthSelect.disabled = true;
       incomeMonthSelect.replaceChildren(new Option('Meses indisponíveis', ''));
       incomeMonthSelect.disabled = true;
+      expenseMonthSelect.replaceChildren(new Option('Meses indisponíveis', ''));
+      expenseMonthSelect.disabled = true;
+      expenseButton.disabled = true;
+      expenseCategoryMonthSelect.replaceChildren(new Option('Meses indisponíveis', ''));
+      expenseCategoryMonthSelect.disabled = true;
+      expenseCategoryList.textContent = error.message || 'Não foi possível carregar as categorias e despesas.';
       incomeMonthSelect.replaceChildren(new Option('Meses indisponíveis', ''));
       incomeMonthSelect.disabled = true;
     });

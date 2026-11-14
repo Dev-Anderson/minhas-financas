@@ -53,6 +53,7 @@ func TestImportReplacesOnlyPreviousTransactions(t *testing.T) {
 	}
 	defer func() {
 		_, _ = store.pool.Exec(ctx, "DELETE FROM entrada WHERE id_mes_ref = $1", monthID)
+		_, _ = store.pool.Exec(ctx, "DELETE FROM expense WHERE id_mes_ref = $1", monthID)
 		_, _ = store.pool.Exec(ctx, "DELETE FROM nubank WHERE id_mes_ref = $1", monthID)
 		_, _ = store.pool.Exec(ctx, "DELETE FROM mes_ref WHERE id = $1", monthID)
 		_, _ = store.pool.Exec(ctx, "DELETE FROM category WHERE id = $1", categoryID)
@@ -83,6 +84,36 @@ func TestImportReplacesOnlyPreviousTransactions(t *testing.T) {
 	if createdIncome.ReferenceMonthID != monthID || createdIncome.Amount != "100.00" {
 		t.Fatalf("unexpected created income: %#v", createdIncome)
 	}
+	createdExpense, err := store.CreateExpense(ctx, monthID, "Integration manual expense", "20.00")
+	if err != nil {
+		t.Fatalf("CreateExpense() error = %v", err)
+	}
+	if createdExpense.ReferenceMonthID != monthID || createdExpense.Valor != "20.00" {
+		t.Fatalf("unexpected created manual expense: %#v", createdExpense)
+	}
+	updatedExpense, err := store.UpdateExpense(ctx, createdExpense.ID, monthID, "Updated manual expense", "22.50")
+	if err != nil {
+		t.Fatalf("UpdateExpense() error = %v", err)
+	}
+	if updatedExpense.Name != "Updated manual expense" || updatedExpense.Valor != "22.50" {
+		t.Fatalf("unexpected updated manual expense: %#v", updatedExpense)
+	}
+	filteredExpenses, err := store.ListExpenses(ctx, &monthID)
+	if err != nil {
+		t.Fatalf("ListExpenses() error = %v", err)
+	}
+	if len(filteredExpenses) != 3 {
+		t.Fatalf("expected three expenses for reference month %d, got %#v", monthID, filteredExpenses)
+	}
+	foundManualExpense := false
+	for _, item := range filteredExpenses {
+		if item.ID == createdExpense.ID && item.Source == "manual" {
+			foundManualExpense = true
+		}
+	}
+	if !foundManualExpense {
+		t.Fatalf("filtered expense list is missing the manual expense: %#v", filteredExpenses)
+	}
 
 	var count int
 	if err := store.pool.QueryRow(ctx, "SELECT COUNT(*) FROM nubank WHERE id_mes_ref = $1", monthID).Scan(&count); err != nil {
@@ -96,7 +127,7 @@ func TestImportReplacesOnlyPreviousTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Summary() error = %v", err)
 	}
-	if summary.Income != "100.00" || summary.Expenses != "50.00" || summary.Balance != "50.00" || summary.ExpenseCount != 2 || summary.CategoryCount != 2 {
+	if summary.Income != "100.00" || summary.Expenses != "72.50" || summary.Balance != "27.50" || summary.ExpenseCount != 3 || summary.CategoryCount != 2 {
 		t.Fatalf("unexpected summary after import: %#v", summary)
 	}
 	if len(summary.Categories) != 2 {
@@ -111,8 +142,28 @@ func TestImportReplacesOnlyPreviousTransactions(t *testing.T) {
 		t.Fatalf("unexpected categorized group: %#v", categorized)
 	}
 	uncategorized := groups["Sem categoria"]
-	if uncategorized.Total != "7.25" || len(uncategorized.Expenses) != 1 || uncategorized.Expenses[0].Name != transactions[1].Title {
+	if uncategorized.Total != "29.75" || len(uncategorized.Expenses) != 2 {
 		t.Fatalf("unexpected uncategorized group: %#v", uncategorized)
+	}
+	foundSummaryManualExpense := false
+	for _, line := range uncategorized.Expenses {
+		if line.ID == createdExpense.ID && line.Source == "manual" && line.Name == "Updated manual expense" {
+			foundSummaryManualExpense = true
+		}
+	}
+	if !foundSummaryManualExpense {
+		t.Fatalf("manual expense action data missing from summary: %#v", uncategorized.Expenses)
+	}
+
+	if err := store.DeleteExpense(ctx, createdExpense.ID); err != nil {
+		t.Fatalf("DeleteExpense() error = %v", err)
+	}
+	summary, err = store.Summary(ctx, monthID)
+	if err != nil {
+		t.Fatalf("Summary() after deleting manual expense error = %v", err)
+	}
+	if summary.Expenses != "50.00" || summary.ExpenseCount != 2 {
+		t.Fatalf("unexpected summary after deleting manual expense: %#v", summary)
 	}
 
 	var preservedCategoryID int64

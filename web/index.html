@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f7f5">
   <title>Minhas Finanças · Visão geral</title>
+  <script>
+    if (localStorage.getItem('minhas-financas-theme') === 'dark') {
+      document.documentElement.dataset.theme = 'dark';
+      document.querySelector('meta[name="theme-color"]').content = '#111914';
+    }
+  </script>
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
@@ -18,6 +24,7 @@
       </a>
       <div class="actions">
         <span class="status-pill"><span class="status-dot"></span>Dados atualizados ao carregar</span>
+        <button class="button secondary-button theme-toggle" id="theme-toggle" type="button" aria-pressed="false">Modo escuro</button>
         <a class="button" href="/settings" aria-label="Abrir configurações">⚙ <span>Configurações</span></a>
       </div>
     </header>
@@ -67,8 +74,34 @@
         <strong id="expense-grand-total">R$ 0,00</strong>
       </div>
     </section>
+
+    <dialog class="expense-edit-dialog" id="expense-edit-dialog" aria-labelledby="expense-edit-title">
+      <h2 id="expense-edit-title">Alterar despesa manual</h2>
+      <form id="expense-edit-form">
+        <div class="expense-edit-fields">
+          <div>
+            <label class="category-label" for="expense-edit-reference-month">Mês de referência</label>
+            <select class="reference-month-select" id="expense-edit-reference-month" name="referenceMonthId" required></select>
+          </div>
+          <div>
+            <label class="category-label" for="expense-edit-name">Descrição</label>
+            <input class="category-input" id="expense-edit-name" name="name" type="text" maxlength="150" required>
+          </div>
+          <div>
+            <label class="category-label" for="expense-edit-amount">Valor (R$)</label>
+            <input class="category-input" id="expense-edit-amount" name="valor" type="text" inputmode="decimal" maxlength="24" required>
+          </div>
+        </div>
+        <div class="expense-edit-actions">
+          <button class="button secondary-button" id="cancel-expense-edit" type="button">Cancelar</button>
+          <button class="button" id="save-expense-edit" type="submit">Salvar alterações</button>
+        </div>
+        <div class="notice" id="expense-edit-notice" role="status" aria-live="polite"></div>
+      </form>
+    </dialog>
   </main>
   <script>
+    const themeToggle = document.getElementById('theme-toggle');
     const monthInput = document.getElementById('reference-month');
     const monthNotice = document.getElementById('month-notice');
     const incomeTotal = document.getElementById('income-total');
@@ -77,13 +110,112 @@
     const expenseCounts = document.getElementById('expense-counts');
     const categoryBreakdown = document.getElementById('category-breakdown');
     const expenseGrandTotal = document.getElementById('expense-grand-total');
+    const expenseEditDialog = document.getElementById('expense-edit-dialog');
+    const expenseEditForm = document.getElementById('expense-edit-form');
+    const expenseEditMonth = document.getElementById('expense-edit-reference-month');
+    const expenseEditName = document.getElementById('expense-edit-name');
+    const expenseEditAmount = document.getElementById('expense-edit-amount');
+    const expenseEditNotice = document.getElementById('expense-edit-notice');
+    const expenseEditButton = document.getElementById('save-expense-edit');
+    const cancelExpenseEditButton = document.getElementById('cancel-expense-edit');
+    let availableReferenceMonths = [];
+    let editingExpenseID = null;
     let summaryRequest = 0;
+
+    function updateThemeToggle() {
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      themeToggle.textContent = isDark ? 'Modo claro' : 'Modo escuro';
+      themeToggle.setAttribute('aria-pressed', String(isDark));
+      themeToggle.setAttribute('aria-label', 'Alternar modo escuro');
+      document.querySelector('meta[name="theme-color"]').content = isDark ? '#111914' : '#f6f7f5';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = nextTheme;
+      updateThemeToggle();
+      try {
+        localStorage.setItem('minhas-financas-theme', nextTheme);
+      } catch {
+        monthNotice.textContent = 'Tema alterado, mas a preferência não pôde ser salva neste navegador.';
+      }
+    });
+    updateThemeToggle();
 
     function formatCurrency(value) {
       return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
-    function renderCategoryBreakdown(summary) {
+    function formatAmountInput(value) {
+      return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function requestJSON(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: { Accept: 'application/json', ...(options.headers || {}) }
+      });
+      if (response.status === 204) return null;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Não foi possível concluir a operação.');
+      return result;
+    }
+
+    function showExpenseEditNotice(message, isError = false) {
+      expenseEditNotice.textContent = message;
+      expenseEditNotice.className = `notice visible ${isError ? 'error' : 'success'}`;
+    }
+
+    function openExpenseEdit(expense, referenceMonthID) {
+      editingExpenseID = expense.id;
+      expenseEditMonth.replaceChildren(new Option('Selecione o mês de referência', ''));
+      availableReferenceMonths.forEach((month) => {
+        expenseEditMonth.add(new Option(month.name, month.id));
+      });
+      expenseEditMonth.value = String(referenceMonthID);
+      expenseEditName.value = expense.name;
+      expenseEditAmount.value = formatAmountInput(expense.amount);
+      expenseEditNotice.className = 'notice';
+      expenseEditDialog.showModal();
+      expenseEditName.focus();
+    }
+
+    cancelExpenseEditButton.addEventListener('click', () => expenseEditDialog.close());
+    expenseEditDialog.addEventListener('close', () => {
+      editingExpenseID = null;
+    });
+
+    expenseEditForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (editingExpenseID == null) {
+        showExpenseEditNotice('Selecione uma despesa manual para alterar.', true);
+        return;
+      }
+
+      expenseEditButton.disabled = true;
+      expenseEditButton.textContent = 'Salvando…';
+      expenseEditNotice.className = 'notice';
+      try {
+        await requestJSON(`/api/expenses/${editingExpenseID}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referenceMonthId: Number(expenseEditMonth.value),
+            name: expenseEditName.value,
+            valor: expenseEditAmount.value
+          })
+        });
+        expenseEditDialog.close();
+        if (await loadSummary()) monthNotice.textContent = 'Despesa manual alterada.';
+      } catch (error) {
+        showExpenseEditNotice(error.message || 'Não foi possível alterar a despesa.', true);
+      } finally {
+        expenseEditButton.disabled = false;
+        expenseEditButton.textContent = 'Salvar alterações';
+      }
+    });
+
+    function renderCategoryBreakdown(summary, referenceMonthID) {
       categoryBreakdown.replaceChildren();
       expenseCounts.textContent = `${summary.expenseCount} despesas · ${summary.categoryCount} categorias`;
       expenseGrandTotal.textContent = formatCurrency(summary.expenses);
@@ -111,11 +243,44 @@
         list.className = 'category-expense-list';
         group.expenses.forEach((expense) => {
           const item = document.createElement('li');
+          const details = document.createElement('div');
+          details.className = 'category-expense-description';
           const description = document.createElement('span');
           description.textContent = expense.name;
           const amount = document.createElement('span');
           amount.textContent = formatCurrency(expense.amount);
-          item.append(description, amount);
+          details.append(description, amount);
+          item.append(details);
+          if (expense.source === 'manual') {
+            const actions = document.createElement('div');
+            actions.className = 'expense-actions';
+            const editButton = document.createElement('button');
+            editButton.className = 'button secondary-button';
+            editButton.type = 'button';
+            editButton.textContent = 'Alterar';
+            editButton.setAttribute('aria-label', `Alterar despesa manual ${expense.name}`);
+            editButton.addEventListener('click', () => openExpenseEdit(expense, referenceMonthID));
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'button danger-button';
+            deleteButton.type = 'button';
+            deleteButton.textContent = 'Excluir';
+            deleteButton.setAttribute('aria-label', `Excluir despesa manual ${expense.name}`);
+            deleteButton.addEventListener('click', async () => {
+              if (!window.confirm(`Excluir a despesa manual “${expense.name}”?`)) return;
+              deleteButton.disabled = true;
+              monthNotice.textContent = 'Excluindo despesa manual…';
+              try {
+                await requestJSON(`/api/expenses/${expense.id}`, { method: 'DELETE' });
+                if (await loadSummary()) monthNotice.textContent = 'Despesa manual excluída.';
+              } catch (error) {
+                monthNotice.textContent = error.message || 'Não foi possível excluir a despesa.';
+              } finally {
+                deleteButton.disabled = false;
+              }
+            });
+            actions.append(editButton, deleteButton);
+            item.append(actions);
+          }
           list.append(item);
         });
         section.append(heading, list);
@@ -125,22 +290,25 @@
 
     async function loadSummary() {
       const requestNumber = ++summaryRequest;
+      const referenceMonthID = monthInput.value;
       monthNotice.textContent = 'Carregando valores do mês selecionado…';
       try {
-        const response = await fetch(`/api/dashboard/summary?referenceMonthId=${encodeURIComponent(monthInput.value)}`, {
+        const response = await fetch(`/api/dashboard/summary?referenceMonthId=${encodeURIComponent(referenceMonthID)}`, {
           headers: { Accept: 'application/json' }
         });
         const summary = await response.json();
         if (!response.ok) throw new Error(summary.error || 'Não foi possível carregar o resumo financeiro.');
-        if (requestNumber !== summaryRequest) return;
+        if (requestNumber !== summaryRequest) return false;
         incomeTotal.textContent = formatCurrency(summary.income);
         expenseTotal.textContent = formatCurrency(summary.expenses);
         balanceTotal.textContent = formatCurrency(summary.balance);
-        renderCategoryBreakdown(summary);
+        renderCategoryBreakdown(summary, referenceMonthID);
         monthNotice.textContent = '';
+        return true;
       } catch (error) {
-        if (requestNumber !== summaryRequest) return;
+        if (requestNumber !== summaryRequest) return false;
         monthNotice.textContent = error.message || 'Não foi possível carregar o resumo financeiro.';
+        return false;
       }
     }
 
@@ -149,6 +317,7 @@
         const response = await fetch('/api/reference-months', { headers: { Accept: 'application/json' } });
         const months = await response.json();
         if (!response.ok) throw new Error(months.error || 'Não foi possível carregar os meses.');
+        availableReferenceMonths = months;
         monthInput.replaceChildren();
         if (months.length === 0) {
           monthInput.add(new Option('Cadastre um mês em Configurações', ''));

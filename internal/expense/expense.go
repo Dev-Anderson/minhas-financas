@@ -10,11 +10,13 @@ import (
 )
 
 var (
-	ErrInvalidName      = errors.New("expense name must contain between 1 and 150 characters")
-	ErrInvalidAmount    = errors.New("expense amount must be a positive value in Brazilian currency format")
-	ErrNotFound         = errors.New("expense not found")
-	ErrCategoryNotFound = errors.New("category not found")
-	ErrInvalidSource    = errors.New("expense source must be manual or nubank")
+	ErrInvalidName            = errors.New("expense name must contain between 1 and 150 characters")
+	ErrInvalidAmount          = errors.New("expense amount must be a positive value in Brazilian currency format")
+	ErrInvalidReferenceMonth  = errors.New("a valid reference month must be selected")
+	ErrReferenceMonthNotFound = errors.New("reference month not found")
+	ErrNotFound               = errors.New("expense not found")
+	ErrCategoryNotFound       = errors.New("category not found")
+	ErrInvalidSource          = errors.New("expense source must be manual or nubank")
 )
 
 const (
@@ -25,16 +27,19 @@ const (
 var amountPattern = regexp.MustCompile(`^(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]{1,2})?$`)
 
 type Expense struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	Valor      string `json:"valor"`
-	CategoryID *int64 `json:"categoryId"`
-	Source     string `json:"source"`
+	ID               int64  `json:"id"`
+	Name             string `json:"name"`
+	Valor            string `json:"valor"`
+	ReferenceMonthID int64  `json:"referenceMonthId,omitempty"`
+	CategoryID       *int64 `json:"categoryId"`
+	Source           string `json:"source"`
 }
 
 type Repository interface {
-	CreateExpense(context.Context, string, string) (Expense, error)
-	ListExpenses(context.Context) ([]Expense, error)
+	CreateExpense(context.Context, int64, string, string) (Expense, error)
+	ListExpenses(context.Context, *int64) ([]Expense, error)
+	UpdateExpense(context.Context, int64, int64, string, string) (Expense, error)
+	DeleteExpense(context.Context, int64) error
 	AssignCategory(context.Context, int64, int64, string) (int64, error)
 }
 
@@ -46,7 +51,10 @@ func NewService(repository Repository) *Service {
 	return &Service{repository: repository}
 }
 
-func (s *Service) Create(ctx context.Context, name, amount string) (Expense, error) {
+func (s *Service) Create(ctx context.Context, referenceMonthID int64, name, amount string) (Expense, error) {
+	if referenceMonthID < 1 {
+		return Expense{}, ErrInvalidReferenceMonth
+	}
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > 150 {
 		return Expense{}, ErrInvalidName
@@ -56,11 +64,39 @@ func (s *Service) Create(ctx context.Context, name, amount string) (Expense, err
 	if err != nil {
 		return Expense{}, err
 	}
-	return s.repository.CreateExpense(ctx, name, normalizedAmount)
+	return s.repository.CreateExpense(ctx, referenceMonthID, name, normalizedAmount)
 }
 
-func (s *Service) List(ctx context.Context) ([]Expense, error) {
-	return s.repository.ListExpenses(ctx)
+func (s *Service) List(ctx context.Context, referenceMonthID *int64) ([]Expense, error) {
+	if referenceMonthID != nil && *referenceMonthID < 1 {
+		return nil, ErrInvalidReferenceMonth
+	}
+	return s.repository.ListExpenses(ctx, referenceMonthID)
+}
+
+func (s *Service) Update(ctx context.Context, expenseID, referenceMonthID int64, name, amount string) (Expense, error) {
+	if expenseID < 1 {
+		return Expense{}, ErrNotFound
+	}
+	if referenceMonthID < 1 {
+		return Expense{}, ErrInvalidReferenceMonth
+	}
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > 150 {
+		return Expense{}, ErrInvalidName
+	}
+	normalizedAmount, err := normalizeAmount(amount)
+	if err != nil {
+		return Expense{}, err
+	}
+	return s.repository.UpdateExpense(ctx, expenseID, referenceMonthID, name, normalizedAmount)
+}
+
+func (s *Service) Delete(ctx context.Context, expenseID int64) error {
+	if expenseID < 1 {
+		return ErrNotFound
+	}
+	return s.repository.DeleteExpense(ctx, expenseID)
 }
 
 func (s *Service) AssignCategory(ctx context.Context, expenseID, categoryID int64, source string) (int64, error) {
